@@ -163,6 +163,39 @@ def set_relative_runpaths(
     return rows
 
 
+def android_note(path: Path, readelf: str = "readelf") -> dict[str, Any] | None:
+    """The minimum API level and NDK an object was built against.
+
+    The NDK stamps every object with a ``.note.android.ident`` note holding the
+    API level it targets. It is the only statement of that floor that comes from
+    the binary itself rather than from the build that claims to have produced
+    it, which is what makes it worth checking.
+    """
+    result = run([readelf, "--notes", str(path)])
+    if result.returncode:
+        raise RuntimeError(f"readelf could not read notes from {path}: {result.stderr.strip()}")
+    if "NT_ANDROID_TYPE_IDENT" not in result.stdout:
+        return None
+
+    tail = result.stdout.split("NT_ANDROID_TYPE_IDENT", 1)[1]
+    marker = "description data:"
+    if marker not in tail:
+        return None
+    hex_bytes = tail.split(marker, 1)[1].split("\n\n", 1)[0]
+    raw = bytes.fromhex("".join(hex_bytes.split()))
+    if len(raw) < 4:
+        return None
+
+    def text(chunk: bytes) -> str:
+        return chunk.split(b"\x00", 1)[0].decode("ascii", "replace")
+
+    return {
+        "api_level": int.from_bytes(raw[:4], "little"),
+        "ndk_version": text(raw[4:68]),
+        "ndk_build_number": text(raw[68:132]),
+    }
+
+
 def section_names(path: Path, readelf: str = "readelf") -> list[str]:
     readelf_path = resolve_tool(readelf)
     result = run([str(readelf_path), "-SW", str(path)])
