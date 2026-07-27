@@ -61,14 +61,19 @@ jobs:
       - name: Build
         run: uv run ./build.py --target ${{ matrix.build }} --tag ${{ steps.pins.outputs.tag }}
 
-      # The archives must not depend on where or when they were built. A second
-      # build in a different directory has to produce the same bytes.
+      # The archives must not depend on where, when, or under what umask they
+      # were built. The second build deliberately uses a different umask:
+      # repeating a build under identical conditions would not have caught the
+      # directory and record modes leaking in from the caller.
       - name: Verify reproducibility
         run: |
-          uv run ./build.py --target ${{ matrix.build }} --tag ${{ steps.pins.outputs.tag }} \
-            --output-dir build-reproducibility-check
+          (
+            umask 002
+            uv run ./build.py --target ${{ matrix.build }} \
+              --tag ${{ steps.pins.outputs.tag }} --output-dir build-reproducibility-check
+          )
           diff build/SHA256SUMS build-reproducibility-check/SHA256SUMS
-          echo "byte identical across runs"
+          echo "byte identical across runs and umasks"
 
       - name: Generate the uv catalog
         run: |

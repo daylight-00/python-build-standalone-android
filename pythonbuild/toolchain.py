@@ -8,10 +8,11 @@ acquired from ``config/toolchain.lock.json`` on demand.
 from __future__ import annotations
 
 import os
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import zstandard
 
 from .downloads import DEFAULT_CACHE, acquire, extract_tarball, host_entry, host_tag
 from .targets import ROOT, Build
@@ -29,7 +30,6 @@ class Toolchain:
     strip: Path
     patchelf: Path
     patchelf_version: str
-    zstd: str
 
     def identity(self) -> dict[str, Any]:
         """Toolchain provenance with no host paths in it.
@@ -47,6 +47,8 @@ class Toolchain:
             "readelf": self.readelf.name,
             "strip": self.strip.name,
             "patchelf_version": self.patchelf_version,
+            "zstandard": zstandard.__version__,
+            "libzstd": ".".join(str(part) for part in zstandard.ZSTD_VERSION),
         }
 
 
@@ -133,9 +135,6 @@ def resolve_toolchain(build: Build, cache: Path = DEFAULT_CACHE) -> Toolchain:
         raise RuntimeError(
             f"NDK {revision} has no compiler for API {build.android_api.level}: {clang}"
         )
-    zstd = shutil.which("zstd")
-    if not zstd:
-        raise RuntimeError("zstd not found on PATH")
     return Toolchain(
         ndk=ndk,
         revision=revision,
@@ -144,5 +143,4 @@ def resolve_toolchain(build: Build, cache: Path = DEFAULT_CACHE) -> Toolchain:
         strip=bindir / "llvm-strip",
         patchelf=resolve_patchelf(lock, cache),
         patchelf_version=lock["patchelf"]["version"],
-        zstd=zstd,
     )

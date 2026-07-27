@@ -201,8 +201,24 @@ python/
 `full` is `.tar.zst`; the install-only flavors are `.tar.gz`. All members share
 one `python/` root with deterministic ordering, normalized ownership and
 timestamps, no absolute or traversal paths, no hard links, and only relative
-non-escaping symlinks. Two builds of the same input produce byte-identical
-archives; CI checks this by building twice.
+non-escaping symlinks.
+
+Two builds of the same input produce byte-identical archives, on any host. Three
+things that would quietly break that are handled explicitly:
+
+- **The caller's umask.** Every `mkdir` and every JSON record written without an
+  explicit mode takes it, and those modes land in the archive. The build sets a
+  fixed umask rather than trusting the one it inherited.
+- **The compressor.** Two versions of zstd compress identical input to different
+  bytes, and the `zstd` on a machine is whatever that machine has. Compression
+  goes through the `zstandard` library, pinned by `uv.lock`, single-threaded
+  because multi-threaded output depends on how the work was divided.
+- **Host paths.** Nothing recorded inside an archive names a build directory, so
+  a temporary workspace cannot leak in or make two builds differ.
+
+CI builds twice and compares, and the second build deliberately runs under a
+different umask — repeating a build under identical conditions proves much less
+than it appears to.
 
 For `upstream`, `python/build/` cannot contain a producer object graph, because
 the project did not produce the objects. It carries the upstream archive

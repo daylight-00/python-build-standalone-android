@@ -11,6 +11,7 @@ option is ``default`` and is selected by naming the triple alone.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -43,6 +44,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Anything created without an explicit mode — every mkdir, every JSON record
+    # — otherwise takes the caller's umask, and lands in the archive. Two hosts
+    # with different umasks would produce different bytes from the same input.
+    os.umask(0o022)
+
     args = parse_args(argv)
     try:
         build = get_build(args.target)
@@ -84,9 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     checks: dict[str, object] = {}
     if not args.skip_verify:
         print("==> verifying install_only is an exact projection of full", flush=True)
-        checks["projection"] = verify_projection(
-            full_archive, install_only_archive, context.toolchain.zstd
-        )
+        checks["projection"] = verify_projection(full_archive, install_only_archive)
         print("==> verifying the stripped flavor only changed ELF payloads", flush=True)
         checks["stripped"] = stripped_shares_non_elf_bytes(install_only_archive, stripped_archive)
 

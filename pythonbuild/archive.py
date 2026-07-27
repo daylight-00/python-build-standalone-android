@@ -18,7 +18,11 @@ from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
-from .utils import run_checked, sha256_path
+import zstandard
+
+from .utils import sha256_path
+
+ZSTD_LEVEL = 19
 
 
 def normalize_member_name(name: str) -> str:
@@ -218,14 +222,18 @@ def write_uncompressed_tar(
     return rows
 
 
-def write_tar_zst(tree_root: Path, output: Path, zstd: str = "zstd") -> list[dict[str, Any]]:
+def write_tar_zst(tree_root: Path, output: Path) -> list[dict[str, Any]]:
+    # The library rather than the zstd CLI: the CLI's version is whatever the
+    # host happens to have, and two versions compress identical input to
+    # different bytes. This one is pinned by uv.lock. Single-threaded because
+    # multi-threaded zstd output depends on how the work was divided.
+    compressor = zstandard.ZstdCompressor(level=ZSTD_LEVEL, threads=0)
     with tempfile.TemporaryDirectory(prefix="pbsa-tar-") as tmp:
         tar_path = Path(tmp) / "artifact.tar"
         rows = write_uncompressed_tar(tree_root, tar_path)
-        run_checked(
-            [zstd, "-q", "-19", "-T1", "-f", str(tar_path), "-o", str(output)],
-            "zstd compression",
-        )
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with tar_path.open("rb") as source, output.open("wb") as target:
+            compressor.copy_stream(source, target)
     return rows
 
 
@@ -244,11 +252,13 @@ def write_tar_gz(tree_root: Path, output: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def extract_tar_zst(archive: Path, destination: Path, zstd: str = "zstd") -> Path:
+def extract_tar_zst(archive: Path, destination: Path) -> Path:
     """Decompress and extract a .tar.zst, returning the extracted tree root."""
     destination.mkdir(parents=True, exist_ok=True)
     tar_path = destination / "archive.tar"
-    run_checked([zstd, "-q", "-d", "-f", str(archive), "-o", str(tar_path)], "zstd decompression")
+    decompressor = zstandard.ZstdDecompressor()
+    with archive.open("rb") as source, tar_path.open("wb") as target:
+        decompressor.copy_stream(source, target)
     tree = destination / "tree"
     safe_extract_tar(tar_path, tree, "r:")
     tar_path.unlink()

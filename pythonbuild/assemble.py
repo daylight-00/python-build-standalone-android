@@ -220,7 +220,7 @@ def assemble_full(context: BuildContext, upstream_archive: Path) -> dict[str, An
             },
         )
 
-        rows = write_tar_zst(python_root, artifact, context.toolchain.zstd)
+        rows = write_tar_zst(python_root, artifact)
 
     return {
         "schema_version": 1,
@@ -244,7 +244,7 @@ def derive_install_only(context: BuildContext, full_archive: Path) -> dict[str, 
 
     with tempfile.TemporaryDirectory(prefix="pbsa-install-only-") as tmp:
         workspace = Path(tmp)
-        tree = extract_tar_zst(full_archive, workspace, context.toolchain.zstd)
+        tree = extract_tar_zst(full_archive, workspace)
         source = tree / "python/install"
         if not source.is_dir():
             raise RuntimeError("full archive has no python/install/")
@@ -318,11 +318,11 @@ def derive_stripped(context: BuildContext, install_only_archive: Path) -> dict[s
     }
 
 
-def verify_projection(full_archive: Path, install_only_archive: Path, zstd: str) -> dict[str, Any]:
+def verify_projection(full_archive: Path, install_only_archive: Path) -> dict[str, Any]:
     """Reconstruct install_only from full and compare member identities."""
     with tempfile.TemporaryDirectory(prefix="pbsa-projection-") as tmp:
         workspace = Path(tmp)
-        full_tree = extract_tar_zst(full_archive, workspace / "full", zstd)
+        full_tree = extract_tar_zst(full_archive, workspace / "full")
         install_tree = workspace / "install-only"
         safe_extract_tar(install_only_archive, install_tree)
 

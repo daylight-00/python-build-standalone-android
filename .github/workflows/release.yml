@@ -76,10 +76,16 @@ jobs:
       - name: Build
         run: uv run ./build.py --target ${{ matrix.build }} --tag ${{ inputs.tag }}
 
+      # The second build deliberately uses a different umask: repeating a build
+      # under identical conditions would not have caught the directory and
+      # record modes leaking in from the caller.
       - name: Verify reproducibility
         run: |
-          uv run ./build.py --target ${{ matrix.build }} --tag ${{ inputs.tag }} \
-            --output-dir build-reproducibility-check
+          (
+            umask 002
+            uv run ./build.py --target ${{ matrix.build }} \
+              --tag ${{ inputs.tag }} --output-dir build-reproducibility-check
+          )
           diff build/SHA256SUMS build-reproducibility-check/SHA256SUMS
 
       # CI has no Android runner, so the one check that matters most is produced
