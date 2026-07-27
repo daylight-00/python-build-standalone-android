@@ -34,11 +34,22 @@ def main(argv: list[str] | None = None) -> int:
     pattern = f"*+{args.tag}-{build.artifact_infix}.build.json"
     receipts = sorted(args.build_dir.glob(pattern))
     if len(receipts) != 1:
-        print(
-            f"expected exactly one build receipt matching {pattern}, "
-            f"found {[path.name for path in receipts]}",
-            file=sys.stderr,
-        )
+        print(f"expected exactly one build receipt matching {pattern}", file=sys.stderr)
+        present = sorted(path.name for path in args.build_dir.glob("*.build.json"))
+        if present:
+            print(f"\n{args.build_dir} holds instead:", file=sys.stderr)
+            for name in present:
+                print(f"  {name}", file=sys.stderr)
+            print(
+                f"\nBuild this tag first:\n  ./build.py --target {args.target} --tag {args.tag}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"\n{args.build_dir} holds no build receipts. Build first:\n"
+                f"  ./build.py --target {args.target} --tag {args.tag}",
+                file=sys.stderr,
+            )
         return 2
     flavors = read_json_object(receipts[0])["flavors"]
     artifacts = {flavor: record["artifact"] for flavor, record in flavors.items()}
