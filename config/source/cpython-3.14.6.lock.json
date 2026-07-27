@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "lock_kind": "cpython-source-build-input",
+  "target": {
+    "triple": "aarch64-linux-android",
+    "build_option": "default",
+    "arch": "aarch64",
+    "abi": "arm64-v8a",
+    "libc": "bionic",
+    "android_api": 34,
+    "android_api_source": "the last API level whose Bionic additions reach CPython's AC_CHECK_FUNCS list"
+  },
+  "python": {
+    "implementation": "cpython",
+    "version": "3.14.6",
+    "major_minor": "3.14"
+  },
+  "source_archive": {
+    "filename": "Python-3.14.6.tar.xz",
+    "url": "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz",
+    "size_bytes": 23921184,
+    "sha256": "143b1dddefaec3bd2e21e3b839b34a2b7fb9842272883c576420d605e9f30c63"
+  },
+  "build_flow": {
+    "driver": "Android/android.py",
+    "dependency_lock": "config/source/android-deps-aarch64-linux-android.lock.json",
+    "dependency_producer": "beeware/cpython-android-source-deps",
+    "dependency_binding": "the exact release assets pinned by CPython 3.14.6 Android/unpack_deps"
+  },
+  "runtime_data_defaults": {
+    "openssldir": "/data/data/com.termux/files/usr/etc/tls",
+    "tzpath": "/data/data/com.termux/files/usr/share/zoneinfo",
+    "runtime_overridable": [
+      "SSL_CERT_FILE",
+      "SSL_CERT_DIR",
+      "PYTHONTZPATH"
+    ]
+  }
+}

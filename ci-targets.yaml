@@ -1,0 +1,67 @@
+# Describes the targets that the CI system will build and release.
+#
+# The triple carries no Android API level. The API level is a minimum-version
+# floor, not an ABI split — the same kind of thing as a minimum glibc version,
+# which upstream also keeps out of its triples. It is additionally a value this
+# project does not choose (see `android_api.policy` below), so encoding a
+# snapshot of it into a permanent identifier would rename artifacts for reasons
+# nobody decided. The floor is published in PYTHON.json, in the docs, and in the
+# release notes instead.
+#
+# Each build option is a separately releasable build. `default` is the flagship
+# and carries no marker in artifact names.
+
+android:
+  aarch64-linux-android:
+    arch: aarch64
+    abi: arm64-v8a
+    libc: bionic
+    ndk: "27.3.13750724"
+    python_versions:
+      - "3.14"
+
+    build_options:
+      default:
+        # Built from CPython source together with all six pinned dependency
+        # recipes, so the build controls its own OpenSSL and time zone defaults.
+        producer: cpython-source
+        input_lock: config/source/cpython-3.14.6.lock.json
+
+        android_api:
+          level: 34
+          policy: last-api-affecting-cpython-configure
+          rationale: >-
+            The highest API level whose Bionic additions appear in CPython's
+            AC_CHECK_FUNCS list. Above it the build makes identical decisions,
+            so raising it would only cost device coverage.
+
+        # Compiled-in defaults, so the standard discovery mechanism works the
+        # way it does in an upstream Linux build. Both stay overridable at
+        # runtime and neither makes the runtime require Termux.
+        runtime_data:
+          mechanism: build-default
+          openssldir: /data/data/com.termux/files/usr/etc/tls
+          tzpath: /data/data/com.termux/files/usr/share/zoneinfo
+
+        uv_catalog: download-metadata.json
+
+      upstream:
+        # The official Python.org Android package, re-assembled. CPython and
+        # native dependency bytes are exactly the official ones.
+        producer: upstream-prebuilt
+        input_lock: config/upstream/cpython-3.14.6-aarch64-linux-android.lock.json
+
+        android_api:
+          level: 24
+          policy: inherited-from-upstream-package
+          rationale: >-
+            Whatever floor the official package was built with. This build
+            exists to keep a permanent baseline whose device coverage is
+            upstream's responsibility, not this project's.
+
+        # The official package is consumed as-is, so no default can be compiled
+        # in. CA and time zone payloads come from the separate data track.
+        runtime_data:
+          mechanism: data-product
+
+        uv_catalog: download-metadata-upstream.json

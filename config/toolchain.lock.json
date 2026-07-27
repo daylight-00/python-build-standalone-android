@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "lock_kind": "android-ndk-toolchain",
+  "ndk": {
+    "revision": "27.3.13750724",
+    "release": "r27d",
+    "channel": "stable",
+    "sdkmanager_package": "ndk;27.3.13750724",
+    "rationale": "the revision pinned by the official CPython 3.14.6 Android release; compiles both the API 24 and the API 34 target from one stable toolchain",
+    "target_compilers": {
+      "aarch64-linux-android24": "aarch64-linux-android24-clang",
+      "aarch64-linux-android34": "aarch64-linux-android34-clang"
+    },
+    "hosts": {
+      "linux-x86_64": {
+        "filename": "android-ndk-r27d-linux.zip",
+        "url": "https://dl.google.com/android/repository/android-ndk-r27d-linux.zip",
+        "size_bytes": 663956036,
+        "sha1": "22105e410cf29afcf163760cc95522b9fb981121",
+        "release_host": true
+      },
+      "darwin": {
+        "filename": "android-ndk-r27d-darwin.zip",
+        "url": "https://dl.google.com/android/repository/android-ndk-r27d-darwin.zip",
+        "size_bytes": 839006233,
+        "sha1": "2970926d705988f79baa9b04c51b4f7914dd8c56",
+        "release_host": false
+      }
+    },
+    "checksum_provenance": "sha1 and size are the values published in Google's SDK repository manifest (https://dl.google.com/android/repository/repository2-3.xml); Google does not publish sha256 there",
+    "aarch64_host": {
+      "official_ndk_available": false,
+      "community_rebuild": "https://github.com/HomuHomu833/android-ndk-custom",
+      "used_for": "on-device (Termux) builds during research",
+      "used_for_release": false
+    }
+  },
+  "patchelf": {
+    "version": "0.19.1",
+    "rationale": "sets the single relative DT_RUNPATH on every ELF; --page-size is required so the 16 KiB program-segment alignment survives the rewrite",
+    "hosts": {
+      "linux-x86_64": {
+        "filename": "patchelf-0.19.1-x86_64.tar.gz",
+        "url": "https://github.com/NixOS/patchelf/releases/download/0.19.1/patchelf-0.19.1-x86_64.tar.gz",
+        "size_bytes": 568926,
+        "sha256": "a6818fef80128fb354423234ecacdcca3e993913d774e5d8346bc63f70fed4cf",
+        "release_host": true
+      },
+      "linux-aarch64": {
+        "filename": "patchelf-0.19.1-aarch64.tar.gz",
+        "url": "https://github.com/NixOS/patchelf/releases/download/0.19.1/patchelf-0.19.1-aarch64.tar.gz",
+        "size_bytes": 546484,
+        "sha256": "a2f8f5add5910a521d35062adf2c9f55d75b65ae5508d290758787004054e702",
+        "release_host": false
+      }
+    },
+    "binary_path": "bin/patchelf"
+  }
+}

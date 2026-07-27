@@ -1,0 +1,9 @@
+/build/
+/build-reproducibility-check/
+/dist/
+/downloads/
+/.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/

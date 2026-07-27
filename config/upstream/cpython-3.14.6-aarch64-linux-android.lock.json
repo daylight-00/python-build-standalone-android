@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "lock_kind": "official-android-package-input",
+  "target": {
+    "triple": "aarch64-linux-android",
+    "build_option": "upstream",
+    "arch": "aarch64",
+    "abi": "arm64-v8a",
+    "libc": "bionic",
+    "android_api": 24,
+    "android_api_source": "the floor the official package was built with; not chosen here"
+  },
+  "python": {
+    "implementation": "cpython",
+    "version": "3.14.6",
+    "major_minor": "3.14"
+  },
+  "archive": {
+    "filename": "python-3.14.6-aarch64-linux-android.tar.gz",
+    "url": "https://www.python.org/ftp/python/3.14.6/python-3.14.6-aarch64-linux-android.tar.gz",
+    "size_bytes": 22358404,
+    "sha256": "38bbe77d3167b5cd554e03b1021324926f09f3825202b065951dd7638e9c37e5"
+  },
+  "producer": {
+    "cpython": "Python.org / CPython Android release tooling",
+    "dependencies": "BeeWare cpython-android-source-deps, as selected by the official CPython package",
+    "ndk": "27.3.13750724"
+  },
+  "policy": {
+    "native_rebuild_forbidden": true,
+    "dependency_substitution_forbidden": true,
+    "fabricated_producer_metadata_forbidden": true
+  }
+}

@@ -1,0 +1,51 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FORCE_COLOR: 1
+
+permissions: {}
+
+jobs:
+  check:
+    name: lint and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv sync --group check
+
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy pythonbuild build.py generate-catalog.py
+
+      # The API level in ci-targets.yaml and the one in the input lock describe
+      # the same floor. If they ever disagree, one of them was edited alone.
+      - name: Validate the build table and input locks
+        run: |
+          uv run python -c "
+          from pythonbuild.targets import load_builds
+          from pythonbuild.utils import read_json_object
+          builds = load_builds()
+          assert builds, 'ci-targets.yaml declares no builds'
+          for name, build in sorted(builds.items()):
+              lock = read_json_object(build.input_lock_path())
+              print(f'{name}: {build.producer}, API {build.android_api.level}, NDK {build.ndk}')
+              assert lock['target']['android_api'] == build.android_api.level, name
+              assert lock['target']['triple'] == build.triple, name
+              assert lock['target']['build_option'] == build.build_option, name
+          "

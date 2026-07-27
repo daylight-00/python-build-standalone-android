@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "source_head": "c63aec69bd59c55314c06c23f4c22c03de76fe45",
+  "target_host": "aarch64-linux-android",
+  "producer_files": {
+    "Android/android-env.sh": "fbe3d49cfdf074d1aff493974b07f5781ce7eb8c9d6df6c7824674b16f94fe4e",
+    "Android/android.py": "1dfe8fe9f6187819f83319916f77e27eaf8df43a73a0696e31c3d9c0950fcd09"
+  },
+  "products": [
+    {
+      "name": "bzip2",
+      "version": "1.0.8",
+      "recipe_revision": "3",
+      "release_tag": "bzip2-1.0.8-3",
+      "target_host": "aarch64-linux-android",
+      "filename": "bzip2-1.0.8-3-aarch64-linux-android.tar.gz",
+      "source_url": "https://github.com/beeware/cpython-android-source-deps/releases/download/bzip2-1.0.8-3/bzip2-1.0.8-3-aarch64-linux-android.tar.gz",
+      "size_bytes": 197400,
+      "sha256": "2385f46e173d525f079946957c007000a8ad11d8496ba66bae99129183d74bd9",
+      "archive": {
+        "member_count": 26,
+        "regular_file_count": 17,
+        "directory_count": 5,
+        "symlink_count": 4,
+        "hardlink_count": 0,
+        "declared_regular_file_bytes": 426553,
+        "top_level_paths": ["bin", "include", "lib", "man"]
+      }
+    },
+    {
+      "name": "libffi",
+      "version": "3.4.4",
+      "recipe_revision": "3",
+      "release_tag": "libffi-3.4.4-3",
+      "target_host": "aarch64-linux-android",
+      "filename": "libffi-3.4.4-3-aarch64-linux-android.tar.gz",
+      "source_url": "https://github.com/beeware/cpython-android-source-deps/releases/download/libffi-3.4.4-3/libffi-3.4.4-3-aarch64-linux-android.tar.gz",
+      "size_bytes": 42455,
+      "sha256": "9f2c0255ce025c177d44db16174ad5158c7560efe3c7ef0c8c0c64b2196e6a9d",
+      "archive": {
+        "member_count": 18,
+        "regular_file_count": 11,
+        "directory_count": 7,
+        "symlink_count": 0,
+        "hardlink_count": 0,
+        "declared_regular_file_bytes": 190956,
+        "top_level_paths": ["include", "lib", "share"]
+      }
+    },
+    {
+      "name": "openssl",
+      "version": "3.5.7",
+      "recipe_revision": "0",
+      "release_tag": "openssl-3.5.7-0",
+      "target_host": "aarch64-linux-android",
+      "filename": "openssl-3.5.7-0-aarch64-linux-android.tar.gz",
+      "source_url": "https://github.com/beeware/cpython-android-source-deps/releases/download/openssl-3.5.7-0/openssl-3.5.7-0-aarch64-linux-android.tar.gz",
+      "size_bytes": 6321792,
+      "sha256": "3d62143ba57f17dfa25816b1ce06256944cb23e5bad1212a419cfd073b1eebab",
+      "archive": {
+        "member_count": 169,
+        "regular_file_count": 158,
+        "directory_count": 9,
+        "symlink_count": 2,
+        "hardlink_count": 0,
+        "declared_regular_file_bytes": 22016703,
+        "top_level_paths": ["bin", "include", "lib"]
+      }
+    },
+    {
+      "name": "sqlite",
+      "version": "3.50.4",
+      "recipe_revision": "0",
+      "release_tag": "sqlite-3.50.4-0",
+      "target_host": "aarch64-linux-android",
+      "filename": "sqlite-3.50.4-0-aarch64-linux-android.tar.gz",
+      "source_url": "https://github.com/beeware/cpython-android-source-deps/releases/download/sqlite-3.50.4-0/sqlite-3.50.4-0-aarch64-linux-android.tar.gz",
+      "size_bytes": 1287749,
+      "sha256": "f446f18d381ed641cb9d58b4768097f9cb7fcce79f7d13be371ee089f2c93e27",
+      "archive": {
+        "member_count": 15,
+        "regular_file_count": 6,
+        "directory_count": 7,
+        "symlink_count": 2,
+        "hardlink_count": 0,
+        "declared_regular_file_bytes": 2939515,
+        "top_level_paths": ["bin", "include", "lib", "share"]
+      }
+    },
+    {
+      "name": "xz",
+      "version": "5.4.6",
+      "recipe_revision": "1",
+      "release_tag": "xz-5.4.6-1",
+      "target_host": "aarch64-linux-android",
+      "filename": "xz-5.4.6-1-aarch64-linux-android.tar.gz",
+      "source_url": "https://github.com/beeware/cpython-android-source-deps/releases/download/xz-5.4.6-1/xz-5.4.6-1-aarch64-linux-android.tar.gz",
+      "size_bytes": 651211,
+      "sha256": "320b76d45dc3499cf855e5310f875cba61c2608e4a98bb280cc4f1b8f189da1a",
+      "archive": {
+        "member_count": 164,
+        "regular_file_count": 120,
+        "directory_count": 13,
+        "symlink_count": 31,
+        "hardlink_count": 0,
+        "declared_regular_file_bytes": 2529682,
+        "top_level_paths": ["bin", "include", "lib", "share"]
+      }
+    },
+    {
+      "name": "zstd",
+      "version": "1.5.7",
+      "recipe_revision": "2",
+      "release_tag": "zstd-1.5.7-2",
+      "target_host": "aarch64-linux-android",
+      "filename": "zstd-1.5.7-2-aarch64-linux-android.tar.gz",
+      "source_url": "https://github.com/beeware/cpython-android-source-deps/releases/download/zstd-1.5.7-2/zstd-1.5.7-2-aarch64-linux-android.tar.gz",
+      "size_bytes": 490959,
+      "sha256": "c3ae98fbe54b0cef9601d9dc120ed692d79609087e6926c70d8fc30face07fe7",
+      "archive": {
+        "member_count": 8,
+        "regular_file_count": 5,
+        "directory_count": 3,
+        "symlink_count": 0,
+        "hardlink_count": 0,
+        "declared_regular_file_bytes": 2411257,
+        "top_level_paths": ["include", "lib"]
+      }
+    }
+  ]
+}

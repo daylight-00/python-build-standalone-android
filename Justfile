@@ -1,0 +1,41 @@
+# Build the archive family for one build, named `triple` or `triple:option`.
+build target tag:
+  uv run ./build.py --target {{target}} --tag {{tag}}
+
+# Build twice and prove the archives are byte identical.
+build-reproducible target tag:
+  #!/usr/bin/env bash
+  set -euxo pipefail
+  rm -rf build build-reproducibility-check
+  uv run ./build.py --target {{target}} --tag {{tag}} --output-dir build
+  uv run ./build.py --target {{target}} --tag {{tag}} --output-dir build-reproducibility-check
+  diff build/SHA256SUMS build-reproducibility-check/SHA256SUMS
+  echo "byte identical across runs"
+
+# Generate the uv download-metadata catalog from a build receipt.
+catalog target tag:
+  uv run ./generate-catalog.py --target {{target}} --tag {{tag}}
+
+# Lint, format check, and typecheck.
+check:
+  uv run ruff check .
+  uv run ruff format --check .
+  uv run mypy pythonbuild build.py generate-catalog.py
+
+# Apply every automatic fix.
+fmt:
+  uv run ruff check --fix .
+  uv run ruff format .
+
+# Print PYTHON.json from a full archive.
+cat-python-json archive:
+  zstd -dc {{archive}} | tar -x --to-stdout python/PYTHON.json
+
+# Compare two archives with diffoscope.
+diff a b:
+  diffoscope \
+    --html build/diff.html \
+    --exclude 'python/build/**' \
+    --max-diff-block-lines 100000 \
+    --max-page-diff-block-lines 100000 \
+    {{a}} {{b}}

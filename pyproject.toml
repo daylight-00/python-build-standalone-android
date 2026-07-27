@@ -1,0 +1,27 @@
+[project]
+name = "python-build-standalone-android"
+version = "0.1.0"
+description = "Produces standalone, redistributable builds of CPython for Android."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jsonschema>=4.23.0",
+    "pyyaml>=6.0.2",
+    "zstandard>=0.23.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.12,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "pythonbuild"
+module-root = ""
+
+[dependency-groups]
+check = [
+    "mypy>=1.19.1",
+    "ruff>=0.15.7",
+    "types-jsonschema>=4.26.0",
+    "types-pyyaml>=6.0.12",
+]

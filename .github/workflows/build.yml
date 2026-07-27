@@ -1,0 +1,86 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FORCE_COLOR: 1
+
+permissions: {}
+
+jobs:
+  build:
+    name: ${{ matrix.build }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Only the upstream-prebuilt build is implemented so far. `artifact`
+          # exists because an artifact name cannot contain the colon that
+          # separates a triple from its build option.
+          - build: aarch64-linux-android:upstream
+            artifact: aarch64-linux-android-upstream
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
+      - name: Resolve the release tag and the pinned NDK
+        id: pins
+        run: |
+          echo "tag=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          echo "ndk=$(uv run python -c "
+          from pythonbuild.utils import read_json_object
+          print(read_json_object('config/toolchain.lock.json')['ndk']['revision'])
+          ")" >> "$GITHUB_OUTPUT"
+
+      - name: Install the pinned NDK
+        run: |
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;${{ steps.pins.outputs.ndk }}"
+
+      - name: Cache pinned downloads
+        uses: actions/cache@v4
+        with:
+          path: downloads
+          key: downloads-${{ hashFiles('config/**/*.json') }}
+
+      - name: Build
+        run: uv run ./build.py --target ${{ matrix.build }} --tag ${{ steps.pins.outputs.tag }}
+
+      # The archives must not depend on where or when they were built. A second
+      # build in a different directory has to produce the same bytes.
+      - name: Verify reproducibility
+        run: |
+          uv run ./build.py --target ${{ matrix.build }} --tag ${{ steps.pins.outputs.tag }} \
+            --output-dir build-reproducibility-check
+          diff build/SHA256SUMS build-reproducibility-check/SHA256SUMS
+          echo "byte identical across runs"
+
+      - name: Generate the uv catalog
+        run: |
+          uv run ./generate-catalog.py --target ${{ matrix.build }} \
+            --tag ${{ steps.pins.outputs.tag }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            build/*.tar.zst
+            build/*.tar.gz
+            build/*.json
+            build/SHA256SUMS
+            dist/*.json
