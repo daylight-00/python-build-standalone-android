@@ -39,14 +39,14 @@ jobs:
 
       - run: uv sync
 
+      # Assigned to a variable first: `echo "x=$(cmd)"` reports echo's exit
+      # status, so a failing cmd would leave an empty output and a green step.
       - name: Resolve the release tag and the pinned NDK
         id: pins
         run: |
+          ndk=$(jq -er '.ndk.revision' config/toolchain.lock.json)
           echo "tag=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
-          echo "ndk=$(uv run python -c "
-          from pythonbuild.utils import read_json_object
-          print(read_json_object('config/toolchain.lock.json')['ndk']['revision'])
-          ")" >> "$GITHUB_OUTPUT"
+          echo "ndk=$ndk" >> "$GITHUB_OUTPUT"
 
       - name: Install the pinned NDK
         run: |

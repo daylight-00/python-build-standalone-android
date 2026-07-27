@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
 
 CHUNK = 1024 * 1024
+
+# Callers include workflow one-liners, which naturally pass a string.
+StrPath = str | os.PathLike[str]
 
 
 def sha256_path(path: Path) -> str:
@@ -32,11 +36,11 @@ def write_json(path: Path, value: Any) -> None:
     path.write_bytes(canonical_json(value))
 
 
-def read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+def read_json(path: StrPath) -> Any:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def read_json_object(path: Path) -> dict[str, Any]:
+def read_json_object(path: StrPath) -> dict[str, Any]:
     value = read_json(path)
     if not isinstance(value, dict):
         raise ValueError(f"top-level JSON must be an object: {path}")
