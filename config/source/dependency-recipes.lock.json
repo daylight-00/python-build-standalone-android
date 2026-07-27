@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "lock_kind": "android-dependency-source-build",
+  "note": "The source build compiles CPython's own dependency set rather than unpacking the prebuilt archives the upstream Android flow downloads. The recipes are upstream's, pinned by tag; only the two overrides below are applied, so this stays a build of upstream's sources rather than a different dependency set.",
+
+  "recipes": {
+    "repository": "https://github.com/beeware/cpython-android-source-deps",
+    "driver": "build.sh <name> <version> <build> <host>",
+    "acquisition": "checked out at the tag pinned per component below"
+  },
+
+  "overrides": [
+    {
+      "id": "unified-ndk",
+      "target": "android-env.sh",
+      "change": "ndk_version 27.2.12479018 -> 27.3.13750724",
+      "reason": "the recipes pin the NDK one revision behind the one CPython pins; building the dependencies and the interpreter with different toolchains is a difference nobody chose"
+    },
+    {
+      "id": "openssl-ca-path",
+      "target": "openssl/build.sh",
+      "change": "add --openssldir to ./Configure",
+      "reason": "OpenSSL's default openssldir is /usr/local/ssl, which does not exist on Android, so the prebuilt archives ship a runtime with an unreachable trust store. This is the whole reason the dependencies are built from source rather than unpacked."
+    }
+  ],
+
+  "environment": {
+    "ANDROID_API_LEVEL": 34,
+    "HOST": "aarch64-linux-android",
+    "ndk": "27.3.13750724"
+  },
+
+  "components": [
+    {
+      "name": "bzip2",
+      "version": "1.0.8",
+      "build": "3",
+      "tag": "bzip2-1.0.8-3",
+      "source": {
+        "filename": "bzip2-1.0.8.tar.gz",
+        "url": "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz",
+        "sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
+      }
+    },
+    {
+      "name": "libffi",
+      "version": "3.4.4",
+      "build": "3",
+      "tag": "libffi-3.4.4-3",
+      "source": {
+        "filename": "libffi-3.4.4.tar.gz",
+        "url": "https://github.com/libffi/libffi/releases/download/v3.4.4/libffi-3.4.4.tar.gz",
+        "sha256": "d66c56ad259a82cf2a9dfc408b32bf5da52371500b84745f7fb8b645712df676"
+      }
+    },
+    {
+      "name": "openssl",
+      "version": "3.5.7",
+      "build": "0",
+      "tag": "openssl-3.5.7-0",
+      "source": {
+        "filename": "openssl-3.5.7.tar.gz",
+        "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz",
+        "sha256": "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8"
+      },
+      "openssldir": "/data/data/com.termux/files/usr/etc/tls"
+    },
+    {
+      "name": "sqlite",
+      "version": "3.50.4",
+      "build": "0",
+      "tag": "sqlite-3.50.4-0",
+      "source": {
+        "filename": "sqlite-autoconf-3500400.tar.gz",
+        "url": "https://www.sqlite.org/2025/sqlite-autoconf-3500400.tar.gz",
+        "sha256": "a3db587a1b92ee5ddac2f66b3edb41b26f9c867275782d46c3a088977d6a5b18"
+      }
+    },
+    {
+      "name": "xz",
+      "version": "5.4.6",
+      "build": "1",
+      "tag": "xz-5.4.6-1",
+      "source": {
+        "filename": "xz-5.4.6.tar.gz",
+        "url": "https://github.com/tukaani-project/xz/releases/download/v5.4.6/xz-5.4.6.tar.gz",
+        "sha256": "aeba3e03bf8140ddedf62a0a367158340520f6b384f75ca6045ccc6c0d43fd5c"
+      }
+    },
+    {
+      "name": "zstd",
+      "version": "1.5.7",
+      "build": "2",
+      "tag": "zstd-1.5.7-2",
+      "source": {
+        "filename": "zstd-1.5.7.tar.gz",
+        "url": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz",
+        "sha256": "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
+      }
+    }
+  ],
+
+  "verification": {
+    "versions_match_upstream": "every version and build number here is the one CPython 3.14.6's Android/android.py unpack_deps names, so the source build produces the dependency set the interpreter expects",
+    "recipe_downloads_are_unverified": "the upstream recipes fetch their sources with wget and no checksum; the build pre-populates each recipe's download directory with the verified file above so the recipe finds it already present"
+  }
+}

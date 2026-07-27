@@ -35,14 +35,14 @@
     },
     "identity": {
       "android_api_level": 24,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/runtime/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/runtime/python/bin/python3.14",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/runtime/python/bin/python3.14",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": true,
       "platform": "android-24-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/runtime/python",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/runtime/python",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
     },
@@ -52,18 +52,18 @@
     "pip": {
       "pass": true,
       "stderr": "",
-      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-almj_k77/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
+      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
     },
     "relocated_identity": {
       "android_api_level": 24,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/relocated/a/deeper/path/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/relocated/a/deeper/path/python/bin/python3.14",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/relocated/a/deeper/path/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/relocated/a/deeper/path/python/bin/python3.14",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": true,
       "platform": "android-24-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/relocated/a/deeper/path/python",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/relocated/a/deeper/path/python",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
     },
@@ -71,7 +71,7 @@
       "pass": true,
       "returncode": 0,
       "stderr": "",
-      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/runtime/python"
+      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/runtime/python"
     },
     "venv": {
       "pass": true,
@@ -80,14 +80,14 @@
     },
     "venv_identity": {
       "android_api_level": 24,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/runtime/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/state/venv/bin/python",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/state/venv/bin/python",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": false,
       "platform": "android-24-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-almj_k77/state/venv",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-6jgsp71z/state/venv",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
     }
