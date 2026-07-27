@@ -106,6 +106,79 @@ def build_cpython(
     }
 
 
+# What a finished distribution keeps out of the build prefix. Upstream's own
+# packaging step uses the same shape of whitelist and drops everything else,
+# which is why the official package has no bin/ at all. This one additionally
+# keeps CPython's own entry points, because this is a command-line runtime
+# rather than an embedding package.
+KEEP = {
+    "bin": ["python3*", "pydoc3*", "idle3*"],
+    "include": ["openssl*", "python*", "sqlite*"],
+    "lib": [
+        "engines-3",
+        "libcrypto*.so*",
+        "libpython*",
+        "libsqlite*.so*",
+        "libssl*.so*",
+        "ossl-modules",
+        "python*",
+    ],
+    "lib/pkgconfig": ["*crypto*", "*ssl*", "*python*", "*sqlite*"],
+}
+
+# The dependency command-line tools must not reach a distribution. They are not
+# what CPython links — it links the libraries — and some of them are the GPLv2
+# scripts that the project's licensing position depends on not shipping.
+FORBIDDEN_IN_BIN = ("xz", "lzma", "bzip2", "bunzip2", "openssl", "sqlite3", "c_rehash")
+
+
+def curate_prefix(source: Path, destination: Path) -> dict[str, Any]:
+    """Reduce a build prefix to the tree a distribution ships."""
+    destination.mkdir(parents=True, exist_ok=True)
+    kept: list[str] = []
+    for rel_dir, patterns in KEEP.items():
+        for pattern in patterns:
+            for path in sorted((source / rel_dir).glob(pattern)):
+                target = destination / rel_dir / path.name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if path.is_symlink():
+                    link = os.readlink(path)
+                    if link.startswith("/"):
+                        raise RuntimeError(f"absolute symlink in the build prefix: {path}")
+                    target.symlink_to(link)
+                elif path.is_dir():
+                    shutil.copytree(path, target, symlinks=True)
+                else:
+                    shutil.copy2(path, target)
+                kept.append(f"{rel_dir}/{path.name}")
+
+    dropped_binaries = sorted(
+        path.name
+        for path in (source / "bin").iterdir()
+        if not (destination / "bin" / path.name).exists()
+    )
+    leaked = sorted(
+        path.name
+        for path in (destination / "bin").iterdir()
+        if any(path.name.startswith(prefix) for prefix in FORBIDDEN_IN_BIN)
+    )
+    if leaked:
+        raise RuntimeError(f"dependency command-line tools reached the distribution: {leaked}")
+    if list(destination.glob("**/*.a")):
+        raise RuntimeError("static archives are build inputs and must not be distributed")
+
+    return {
+        "schema_version": 1,
+        "kept": kept,
+        "dropped_from_bin": dropped_binaries,
+        "rationale": (
+            "the dependency command-line tools are not what CPython links, and some of "
+            "them are the GPLv2 scripts this project's licensing position depends on not "
+            "shipping"
+        ),
+    }
+
+
 def verify_prefix(prefix: Path, *, android_api: int, readelf: str) -> dict[str, Any]:
     """Every object in the finished prefix must report the requested API level.
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 from pythonbuild.assemble import (
@@ -20,6 +21,7 @@ from pythonbuild.assemble import (
     assemble_full,
     derive_install_only,
     derive_stripped,
+    prepare_upstream_prefix,
     stripped_shares_non_elf_bytes,
     verify_projection,
 )
@@ -57,13 +59,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"known builds: {', '.join(sorted(load_builds()))}", file=sys.stderr)
         return 2
 
-    if not build.from_upstream_prebuilt:
-        print(
-            f"{build.name} is produced from CPython source, which is not implemented yet",
-            file=sys.stderr,
-        )
-        return 2
-
     context = BuildContext(
         build=build,
         toolchain=resolve_toolchain(build, args.cache),
@@ -72,11 +67,21 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     print(f"==> {build.name}, minimum Android API {build.android_api.level}", flush=True)
-    print("==> acquiring the pinned input", flush=True)
-    upstream = acquire(context.lock["archive"], args.cache, what="official Android package")
+    if not build.from_upstream_prebuilt:
+        print(
+            f"{build.name} is produced from CPython source, which is not wired into "
+            "build.py yet; see pythonbuild/cpython_source.py",
+            file=sys.stderr,
+        )
+        return 2
 
-    print("==> assembling full", flush=True)
-    full = assemble_full(context, upstream)
+    with tempfile.TemporaryDirectory(prefix="pbsa-input-") as tmp:
+        print("==> acquiring the pinned input", flush=True)
+        upstream = acquire(context.lock["archive"], args.cache, what="official Android package")
+        source = prepare_upstream_prefix(context, upstream, Path(tmp))
+
+        print("==> assembling full", flush=True)
+        full = assemble_full(context, source)
     full_archive = context.output_dir / full["artifact"]["filename"]
 
     print("==> deriving install_only", flush=True)

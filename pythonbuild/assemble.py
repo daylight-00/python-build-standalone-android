@@ -48,6 +48,24 @@ LICENSE_SOURCE = ROOT / "licenses"
 
 
 @dataclass(frozen=True)
+class PrefixSource:
+    """An install prefix ready to be packaged, and where it came from.
+
+    The two producers differ only here. The upstream-derived build extracts a
+    prefix out of the official package and has to supply an interpreter, because
+    that package is embedding-oriented and ships none. The source build produces
+    its own prefix with CPython's own interpreter already in it.
+    """
+
+    prefix: Path
+    python_version: str
+    python_mm: str
+    record: dict[str, Any]
+    retained: Path | None = None
+    needs_launcher: bool = True
+
+
+@dataclass(frozen=True)
 class BuildContext:
     build: Build
     toolchain: Toolchain
@@ -112,57 +130,83 @@ def _install_licenses(install: Path) -> dict[str, Any]:
     }
 
 
-def _copy_upstream_material(extracted: Path, archive: Path, build: Path) -> None:
-    """Retain the exact input and every non-prefix file it carried."""
-    package = build / "upstream/package"
-    package.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(archive, package / archive.name)
-    metadata = build / "upstream/extracted-metadata"
+def _copy_retained_material(retained: Path, build: Path) -> None:
+    """Keep the input material the archive should carry with it."""
+    target = build / "upstream"
+    target.mkdir(parents=True, exist_ok=True)
+    for child in sorted(retained.iterdir(), key=lambda item: item.name):
+        copy_entry(child, target / child.name)
+
+
+def prepare_upstream_prefix(context: BuildContext, archive: Path, workspace: Path) -> PrefixSource:
+    """Extract the official Android package into a prefix ready to package."""
+    lock = context.lock
+    observed = require_identity(archive, lock["archive"], "official Android package")
+
+    extracted = workspace / "upstream"
+    safe_extract_tar(archive, extracted)
+    prefix = extracted / "prefix"
+    if not prefix.is_dir():
+        raise RuntimeError("official package is missing prefix/")
+    if (prefix / "bin").exists():
+        # The embedding package ships no executables. A bin/ payload would change
+        # both the launcher story and the license obligations.
+        raise RuntimeError("official package unexpectedly contains prefix/bin")
+
+    # The exact input, and every file it carried outside the prefix, travel with
+    # the archive so a consumer can see what it was derived from.
+    retained = workspace / "retained"
+    (retained / "package").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(archive, retained / "package" / archive.name)
+    metadata = retained / "extracted-metadata"
     metadata.mkdir(parents=True, exist_ok=True)
     for child in sorted(extracted.iterdir(), key=lambda item: item.name):
-        if child.name == "prefix":
-            continue
-        copy_entry(child, metadata / child.name)
+        if child.name != "prefix":
+            copy_entry(child, metadata / child.name)
+
+    return PrefixSource(
+        prefix=prefix,
+        python_version=lock["python"]["version"],
+        python_mm=lock["python"]["major_minor"],
+        record={
+            "official_input": observed,
+            "lock": context.build.input_lock,
+            "producer": lock["producer"],
+        },
+        retained=retained,
+        needs_launcher=True,
+    )
 
 
-def assemble_full(context: BuildContext, upstream_archive: Path) -> dict[str, Any]:
-    """Build the canonical ``full`` archive from the official Android package."""
+def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]:
+    """Build the canonical ``full`` archive from a prepared install prefix."""
     build = context.build
-    if not build.from_upstream_prebuilt:
-        raise NotImplementedError(
-            f"build {build.name} is produced from CPython source; "
-            "source builds are not implemented yet"
-        )
-    lock = context.lock
-    python_version = lock["python"]["version"]
-    python_mm = lock["python"]["major_minor"]
-    observed_input = require_identity(upstream_archive, lock["archive"], "official Android package")
+    python_version = source.python_version
+    python_mm = source.python_mm
 
     context.output_dir.mkdir(parents=True, exist_ok=True)
     artifact = context.output_dir / f"{context.stem(python_version)}-full.tar.zst"
 
     with tempfile.TemporaryDirectory(prefix="pbsa-full-") as tmp:
         workspace = Path(tmp)
-        extracted = workspace / "upstream"
-        safe_extract_tar(upstream_archive, extracted)
-        prefix = extracted / "prefix"
-        if not prefix.is_dir():
-            raise RuntimeError("official package is missing prefix/")
-        if (prefix / "bin").exists():
-            # The embedding package ships no executables. A bin/ payload would
-            # change both the launcher story and the license obligations.
-            raise RuntimeError("official package unexpectedly contains prefix/bin")
+        prefix = source.prefix
 
         python_root = workspace / "full/python"
         install = python_root / "install"
         build_root = python_root / "build"
         copy_tree_contents(prefix, install)
 
-        launcher_binary = workspace / "launcher/python"
-        launcher_record = build_launcher(
-            prefix, launcher_binary, toolchain=context.toolchain, python_mm=python_mm
-        )
-        launcher_record["aliases"] = _install_launcher(install, launcher_binary, python_mm)
+        # Only the upstream-derived build needs one. The source build ships
+        # CPython's own interpreter, so there is no project launcher and
+        # therefore no launcher record — absence says it better than a record
+        # asserting that nothing was supplied.
+        launcher_record: dict[str, Any] | None = None
+        if source.needs_launcher:
+            launcher_binary = workspace / "launcher/python"
+            launcher_record = build_launcher(
+                prefix, launcher_binary, toolchain=context.toolchain, python_mm=python_mm
+            )
+            launcher_record["aliases"] = _install_launcher(install, launcher_binary, python_mm)
 
         overlay = apply_consumer_overlay(install, python_mm=python_mm, host_triple=build.triple)
         config_vars_source = sysconfig_vars_json(install, python_mm)
@@ -172,18 +216,12 @@ def assemble_full(context: BuildContext, upstream_archive: Path) -> dict[str, An
             install, str(context.toolchain.patchelf), str(context.toolchain.readelf)
         )
 
-        _copy_upstream_material(extracted, upstream_archive, build_root)
+        if source.retained is not None:
+            _copy_retained_material(source.retained, build_root)
         records = build_root / "records"
-        write_json(
-            records / "input.json",
-            {
-                "schema_version": 1,
-                "official_input": observed_input,
-                "lock": build.input_lock,
-                "producer": lock["producer"],
-            },
-        )
-        write_json(records / "launcher.json", {"schema_version": 1, **launcher_record})
+        write_json(records / "input.json", {"schema_version": 1, **source.record})
+        if launcher_record is not None:
+            write_json(records / "launcher.json", {"schema_version": 1, **launcher_record})
         write_json(
             records / "mutations.json",
             {
@@ -229,8 +267,7 @@ def assemble_full(context: BuildContext, upstream_archive: Path) -> dict[str, An
         "python_version": python_version,
         "tag": context.tag,
         "artifact": {**file_identity(artifact), "member_count": len(rows)},
-        "official_input": observed_input,
-        "launcher_sha256": launcher_record["binary"]["sha256"],
+        "launcher": launcher_record["binary"]["sha256"] if launcher_record else None,
         "elf_object_count": len(runpaths),
         "pip_version": pip["wheel"]["version"],
     }
