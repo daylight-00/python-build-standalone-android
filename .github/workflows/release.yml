@@ -1,0 +1,191 @@
+name: release
+
+# Releases are manual and gated, as upstream's are. Nothing here runs on a push.
+#
+# `dry-run` defaults to true: this project has never published, and a release is
+# the one action in the repository that cannot be taken back.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag (e.g. 20260727)."
+        type: string
+        required: true
+      sha:
+        description: "Full SHA of the commit to release."
+        type: string
+        required: true
+      dry-run:
+        description: "Build, gate, and assemble everything without publishing."
+        type: boolean
+        default: true
+
+env:
+  FORCE_COLOR: 1
+
+permissions: {}
+
+jobs:
+  gate:
+    name: release gate
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - run: echo "Release of ${{ inputs.sha }} as ${{ inputs.tag }} approved"
+
+  build:
+    name: build ${{ matrix.build }}
+    needs: gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - build: aarch64-linux-android:upstream
+            artifact: aarch64-linux-android-upstream
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
+      - name: Resolve the pinned NDK
+        id: pins
+        run: |
+          echo "ndk=$(uv run python -c "
+          from pythonbuild.utils import read_json_object
+          print(read_json_object('config/toolchain.lock.json')['ndk']['revision'])
+          ")" >> "$GITHUB_OUTPUT"
+
+      - name: Install the pinned NDK
+        run: |
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;${{ steps.pins.outputs.ndk }}"
+
+      - name: Cache pinned downloads
+        uses: actions/cache@v4
+        with:
+          path: downloads
+          key: downloads-${{ hashFiles('config/**/*.json') }}
+
+      - name: Build
+        run: uv run ./build.py --target ${{ matrix.build }} --tag ${{ inputs.tag }}
+
+      - name: Verify reproducibility
+        run: |
+          uv run ./build.py --target ${{ matrix.build }} --tag ${{ inputs.tag }} \
+            --output-dir build-reproducibility-check
+          diff build/SHA256SUMS build-reproducibility-check/SHA256SUMS
+
+      # CI has no Android runner, so the one check that matters most is produced
+      # on a device and committed. It has to cover these exact bytes.
+      - name: Device qualification gate
+        run: uv run ./check-qualification.py --target ${{ matrix.build }} --tag ${{ inputs.tag }}
+
+      - name: Generate the uv catalog
+        run: uv run ./generate-catalog.py --target ${{ matrix.build }} --tag ${{ inputs.tag }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            build/*.tar.zst
+            build/*.tar.gz
+            build/*.json
+            dist/*.json
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: true
+
+      - uses: astral-sh/setup-uv@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          path: incoming
+
+      - name: Collect the release assets
+        run: |
+          mkdir -p dist
+          find incoming -name '*.tar.zst' -o -name '*.tar.gz' | xargs -I{} cp {} dist/
+          find incoming -name 'download-metadata*.json' -o -name 'latest-release.json' \
+            | xargs -I{} cp {} dist/
+          cd dist && sha256sum *.tar.zst *.tar.gz | sort -k2 > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Render the release notes
+        run: |
+          uv sync
+          uv run ./release-notes.py --tag ${{ inputs.tag }} --build-dir incoming \
+            -o dist/RELEASE_NOTES.md
+          cat dist/RELEASE_NOTES.md
+
+      - name: Generate attestations
+        if: ${{ !inputs.dry-run }}
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/*.tar.zst
+            dist/*.tar.gz
+
+      - name: Create the release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ inputs.tag }}" \
+            --target "${{ inputs.sha }}" \
+            --title "${{ inputs.tag }}" \
+            --draft \
+            --notes-file dist/RELEASE_NOTES.md
+          gh release upload "${{ inputs.tag }}" dist/*.tar.zst dist/*.tar.gz \
+            dist/SHA256SUMS dist/download-metadata*.json
+
+      # Only once every asset is uploaded, so the catalogs never point at a
+      # release that has nothing in it.
+      - name: Publish the release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ inputs.tag }}" --draft=false
+
+      - name: Update the latest-release branch
+        if: ${{ !inputs.dry-run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin latest-release || true
+          if git rev-parse --verify origin/latest-release >/dev/null 2>&1; then
+            git switch latest-release
+          else
+            git switch --orphan latest-release
+            git rm -rq --cached . 2>/dev/null || true
+          fi
+          find . -maxdepth 1 -name '*.json' -delete
+          cp dist/download-metadata*.json dist/latest-release.json .
+          git add -A -- '*.json'
+          git commit -m "chore: publish ${{ inputs.tag }} catalogs"
+          git push origin latest-release
+
+      - name: Dry run summary
+        if: ${{ inputs.dry-run }}
+        run: |
+          echo "Dry run: everything below would have been published as ${{ inputs.tag }}."
+          ls -la dist

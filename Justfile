@@ -16,6 +16,14 @@ build-reproducible target tag:
 catalog target tag:
   uv run ./generate-catalog.py --target {{target}} --tag {{tag}}
 
+# Confirm a committed device receipt covers the artifacts just built.
+check-qualification target tag:
+  uv run ./check-qualification.py --target {{target}} --tag {{tag}}
+
+# Render the release notes for a tag from its build receipts.
+release-notes tag:
+  uv run ./release-notes.py --tag {{tag}}
+
 # Lint, format check, and typecheck.
 check:
   uv run ruff check .

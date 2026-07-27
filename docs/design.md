@@ -299,15 +299,38 @@ Releases are manual, as upstream: `workflow_dispatch` with an explicit tag and
 commit, gated on a protected environment. There is no automatic release on
 green.
 
-Every release carries `SHA256SUMS`, third-party notices, build provenance
-attestations, and a `download-metadata.json` catalog per build option. The
-`latest-release` branch publishes the catalogs and a `latest-release.json`
-pointer at stable raw URLs.
+`dry-run` defaults to true. A release is the one action in this repository that
+cannot be taken back, so publishing has to be asked for explicitly.
 
-One thing CI cannot do is run the distribution on a real device. Device
-qualification is produced out of band and committed as a receipt; the release
-workflow refuses to publish a build whose receipt is missing or does not match
-the artifacts being released.
+Every release carries `SHA256SUMS`, per-component license texts inside each
+archive, build provenance attestations, generated release notes, and a
+`download-metadata.json` catalog per build option. The release is created as a
+draft and only published once every asset is uploaded, so a catalog never points
+at an empty release. The `latest-release` branch then publishes the catalogs and
+a `latest-release.json` pointer at stable raw URLs.
+
+Release notes are generated from the build receipts rather than written by hand,
+because they have to state the minimum Android API per build. That floor is
+derived rather than chosen and can therefore move without anyone deciding to
+move it; the notes are where that becomes visible.
+
+### The device qualification gate
+
+CI has no Android runner, so the check that matters most — does this actually
+run? — cannot happen there. `qualify.py` runs on a device against a built
+archive and writes a receipt recording what it found: interpreter identity,
+every extension module imported, every shared library `dlopen`ed, a subprocess
+spawned, `pip` and `venv` exercised, and the whole prefix copied to a deeper path
+and re-checked. It uses only the standard library, because a device is not
+guaranteed to have anything else, and it never raises: a probe that cannot even
+start is recorded as a failure rather than losing the receipt.
+
+Receipts are committed under `qualification/<tag>/<build>.json`, and the release
+workflow refuses to publish unless one covers **every artifact in the release by
+SHA-256**. A receipt is evidence only for the bytes it names, so one produced
+against an earlier build cannot be carried forward silently. The gate also
+checks that the device's ABI is one this project releases for and that the
+interpreter reported the API level the build declares.
 
 ## uv integration
 
