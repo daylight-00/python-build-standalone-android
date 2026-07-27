@@ -264,9 +264,8 @@ def build_python_json(
         "python_extension_module_loading": ["builtin", "shared-library"],
         "build_info": {"core": core, "extensions": dict(sorted(extensions.items()))},
         "licenses": CPYTHON_LICENSES,
-        # Upstream points this at python/licenses/LICENSE.cpython.txt. This
-        # project has no python/licenses/ root yet, so it names the license text
-        # the distribution actually carries. Assembling that root is a release
-        # blocker; see docs/design.md.
-        "license_path": f"install/{layout.stdlib}/LICENSE.txt",
+        # Upstream keeps this at python/licenses/, a sibling of python/install/
+        # that the install-only projection drops. Keeping it inside the prefix
+        # lands it at python/licenses/ there too. See docs/design.md.
+        "license_path": "install/licenses/LICENSE.cpython.txt",
     }

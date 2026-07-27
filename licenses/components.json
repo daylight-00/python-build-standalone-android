@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "note": "Every component whose code the distributions carry, and the license text shipped for it. The texts are copied verbatim into python/licenses/ in each archive. When a component version changes, the corresponding text is refreshed from the origin recorded here.",
+  "components": [
+    {
+      "component": "cpython",
+      "version": "3.14.6",
+      "spdx": ["Python-2.0", "CNRI-Python"],
+      "file": "LICENSE.cpython.txt",
+      "origin": "LICENSE in the CPython source distribution",
+      "also_in_payload": "install/lib/python3.14/LICENSE.txt"
+    },
+    {
+      "component": "expat",
+      "spdx": ["MIT"],
+      "file": "LICENSE.expat.txt",
+      "origin": "Modules/expat/COPYING in the CPython source distribution",
+      "linkage": "compiled into the pyexpat extension"
+    },
+    {
+      "component": "mpdecimal",
+      "version": "2.5.1",
+      "spdx": ["BSD-2-Clause"],
+      "file": "LICENSE.mpdecimal.txt",
+      "origin": "the header comment of Modules/_decimal/libmpdec/mpdecimal.c in the CPython source distribution",
+      "linkage": "compiled into the _decimal extension"
+    },
+    {
+      "component": "hacl-star",
+      "spdx": ["MIT"],
+      "file": "LICENSE.hacl.txt",
+      "origin": "the header comment of the vendored HACL* sources under Modules/_hacl in the CPython source distribution",
+      "linkage": "compiled into the hashlib extensions"
+    },
+    {
+      "component": "openssl",
+      "version": "3.5.7",
+      "spdx": ["Apache-2.0"],
+      "file": "LICENSE.openssl-3.txt",
+      "origin": "LICENSE.txt in the OpenSSL source distribution",
+      "linkage": "libcrypto and libssl, shipped as shared libraries"
+    },
+    {
+      "component": "sqlite",
+      "version": "3.50.4",
+      "spdx": [],
+      "classification": "public domain",
+      "file": "LICENSE.sqlite.txt",
+      "origin": "SQLite ships no license file; this is its published public-domain dedication (https://sqlite.org/copyright.html), matching the disclaimer carried in every SQLite source file",
+      "linkage": "compiled into the _sqlite3 extension"
+    },
+    {
+      "component": "bzip2",
+      "version": "1.0.8",
+      "spdx": ["bzip2-1.0.6"],
+      "file": "LICENSE.bzip2.txt",
+      "origin": "LICENSE in the bzip2 source distribution",
+      "linkage": "compiled into the _bz2 extension"
+    },
+    {
+      "component": "libffi",
+      "version": "3.4.4",
+      "spdx": ["MIT"],
+      "file": "LICENSE.libffi.txt",
+      "origin": "LICENSE in the libffi source distribution",
+      "linkage": "compiled into the _ctypes extension"
+    },
+    {
+      "component": "liblzma",
+      "version": "5.4.6",
+      "spdx": [],
+      "classification": "public domain",
+      "file": "LICENSE.liblzma.txt",
+      "origin": "COPYING in the XZ Utils source distribution, kept whole because it is the document that records which parts of the package carry which terms",
+      "linkage": "compiled into the _lzma extension",
+      "note": "In 5.4.6 liblzma itself is public domain. The GPLv2 terms the same document mentions cover the xz command-line scripts, which the distributions do not carry."
+    },
+    {
+      "component": "zstd",
+      "version": "1.5.7",
+      "spdx": ["BSD-3-Clause"],
+      "file": "LICENSE.zstd.txt",
+      "origin": "LICENSE in the zstd source distribution",
+      "linkage": "compiled into the _zstd extension",
+      "note": "zstd is dual licensed BSD-3-Clause or GPL-2.0-only; the BSD terms apply here."
+    },
+    {
+      "component": "pip",
+      "spdx": ["MIT"],
+      "file": null,
+      "origin": "pip and all of its vendored packages carry their own license files inside the payload, under lib/python3.14/site-packages/pip-*.dist-info/licenses/",
+      "linkage": "installed into site-packages from the distribution's own ensurepip wheel"
+    },
+    {
+      "component": "project-launcher",
+      "spdx": ["Python-2.0"],
+      "file": null,
+      "origin": "cpython-android/python.c is modelled on CPython's Programs/python.c and is covered by LICENSE.cpython.txt",
+      "linkage": "bin/python3.14"
+    },
+    {
+      "component": "android-system-libraries",
+      "spdx": [],
+      "classification": "not distributed",
+      "file": null,
+      "origin": "libc, libdl, libm, and liblog are provided by the device and are only linked against, never shipped"
+    }
+  ]
+}

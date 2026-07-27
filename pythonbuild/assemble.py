@@ -31,11 +31,20 @@ from .launcher import build_launcher
 from .pip_surface import install_bundled_pip
 from .python_json import build_python_json
 from .runtime_metadata import apply_consumer_overlay, sysconfig_vars_json
-from .targets import Build
+from .targets import ROOT, Build
 from .toolchain import Toolchain
 from .utils import file_identity, read_json_object, require_identity, sha256_path, write_json
 
 RECORDS = "build/records"
+
+# Upstream puts per-component license texts in python/licenses/, which is a
+# sibling of python/install/ and so does not survive the install-only
+# projection — the flavor most consumers actually take ships without them.
+# Placing them inside the prefix instead lands them at python/licenses/ in
+# install-only, the same relative path upstream uses, and keeps them in every
+# flavor.
+LICENSES = "licenses"
+LICENSE_SOURCE = ROOT / "licenses"
 
 
 @dataclass(frozen=True)
@@ -67,6 +76,40 @@ def _install_launcher(install: Path, launcher: Path, python_mm: str) -> list[dic
         os.symlink(f"python{python_mm}", alias)
         aliases.append({"path": f"bin/{name}", "target": f"python{python_mm}"})
     return aliases
+
+
+def _install_licenses(install: Path) -> dict[str, Any]:
+    """Copy the per-component license texts into the prefix."""
+    manifest = LICENSE_SOURCE / "components.json"
+    if not manifest.is_file():
+        raise RuntimeError(f"license manifest is missing: {manifest}")
+    target = install / LICENSES
+    target.mkdir(parents=True, exist_ok=True)
+    rows: list[dict[str, Any]] = []
+    for source in sorted(LICENSE_SOURCE.glob("LICENSE.*.txt")):
+        shutil.copyfile(source, target / source.name)
+        os.chmod(target / source.name, 0o644)
+        rows.append({"path": f"{LICENSES}/{source.name}", "sha256": sha256_path(source)})
+    shutil.copyfile(manifest, target / manifest.name)
+    os.chmod(target / manifest.name, 0o644)
+
+    declared = {
+        component["file"]
+        for component in read_json_object(manifest)["components"]
+        if component.get("file")
+    }
+    shipped = {Path(row["path"]).name for row in rows}
+    if declared != shipped:
+        raise RuntimeError(
+            f"license manifest and payload disagree: "
+            f"declared-only={sorted(declared - shipped)} shipped-only={sorted(shipped - declared)}"
+        )
+    return {
+        "schema_version": 1,
+        "root": LICENSES,
+        "manifest": f"{LICENSES}/{manifest.name}",
+        "files": rows,
+    }
 
 
 def _copy_upstream_material(extracted: Path, archive: Path, build: Path) -> None:
@@ -124,6 +167,7 @@ def assemble_full(context: BuildContext, upstream_archive: Path) -> dict[str, An
         overlay = apply_consumer_overlay(install, python_mm=python_mm, host_triple=build.triple)
         config_vars_source = sysconfig_vars_json(install, python_mm)
         pip = install_bundled_pip(install, python_mm)
+        licenses = _install_licenses(install)
         runpaths = set_relative_runpaths(
             install, str(context.toolchain.patchelf), str(context.toolchain.readelf)
         )
@@ -147,6 +191,7 @@ def assemble_full(context: BuildContext, upstream_archive: Path) -> dict[str, An
                 "elf_runpath": runpaths,
                 "runtime_metadata": overlay,
                 "pip_surface": pip,
+                "licenses": licenses,
             },
         )
         write_json(

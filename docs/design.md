@@ -381,11 +381,32 @@ One file here is not original: `cpython-android/python.c` is modelled on
 CPython's `Programs/python.c` and is covered by the Python license, as noted in
 its header.
 
-Upstream places per-component license texts in a `python/licenses/` root inside
-every archive and points `license_path` at
-`licenses/LICENSE.cpython.txt`. That root is not assembled yet, so `license_path`
-currently names the license text the distribution already carries. **Assembling
-it is a release blocker: no release may be published without it.**
+### Where the license texts live
+
+Per-component license texts are committed at `licenses/` and copied into every
+archive, one plain-text file per component, as upstream does. `licenses/components.json`
+records, for each component, its version, its SPDX identifier, which text ships
+for it, and where that text came from; the assembler fails if the manifest and
+the shipped set disagree.
+
+The placement deviates from upstream by one directory, deliberately. Upstream
+copies its texts into `python/licenses/`, which is a sibling of
+`python/install/` — and the install-only projection carries forward only what is
+under `python/install/`, so the flavor most consumers actually take ships
+without any third-party license text. Putting the same files inside the prefix
+instead means the projection lands them at `python/licenses/`, the same relative
+path upstream uses, in every flavor. `license_path` names them there.
+
+Two components ship no separate file. pip and all of its vendored packages carry
+their own license files inside the payload, under
+`lib/python3.14/site-packages/pip-*.dist-info/licenses/`. Android's `libc`,
+`libdl`, `libm`, and `liblog` are provided by the device and only linked
+against, never distributed.
+
+Texts are taken from the versions this project actually ships, which is why
+several differ from upstream's copy of the same component: upstream's
+`LICENSE.liblzma.txt` carries the 0BSD terms that XZ Utils adopted in 5.6, while
+the 5.4.6 this project ships is public domain.
 
 ## Out of scope
 

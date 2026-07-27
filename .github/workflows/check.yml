@@ -33,6 +33,20 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy pythonbuild build.py generate-catalog.py
 
+      # The assembler enforces this too, but failing here takes seconds rather
+      # than a full build.
+      - name: Validate the license manifest
+        run: |
+          uv run python -c "
+          from pathlib import Path
+          from pythonbuild.utils import read_json_object
+          root = Path('licenses')
+          declared = {c['file'] for c in read_json_object(root / 'components.json')['components'] if c.get('file')}
+          shipped = {p.name for p in root.glob('LICENSE.*.txt')}
+          assert declared == shipped, f'declared-only={sorted(declared - shipped)} shipped-only={sorted(shipped - declared)}'
+          print(f'{len(shipped)} component license texts, manifest agrees')
+          "
+
       # The API level in ci-targets.yaml and the one in the input lock describe
       # the same floor. If they ever disagree, one of them was edited alone.
       - name: Validate the build table and input locks
