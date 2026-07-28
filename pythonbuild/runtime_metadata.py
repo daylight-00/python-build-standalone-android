@@ -365,12 +365,42 @@ HOST_DISCOVERED_VARS = {
 }
 
 
-def _patch_sysconfig_vars_json(path: Path) -> dict[str, Any]:
-    """Drop the values this file recorded about the machine that built it.
+def drop_host_discovered_values(sysdata: Path, sysvars: Path, makefile: Path) -> dict[str, Any]:
+    """Remove the values configure and the build interpreter took from this machine.
 
-    Both are recomputed by ``sysconfig`` at runtime, so what is stored here is
-    inert; it is dropped because a distribution should not carry the build
-    machine's directories, and because two hosts would otherwise disagree.
+    ``MKDIR_P`` is whichever ``mkdir`` came first on the build machine's PATH, and
+    ``userbase`` is the build user's home. ``sysconfig`` recomputes both at
+    runtime, so nothing reads what is stored here, and they are the only values in
+    these files that describe the machine rather than the target.
+
+    Done before any of these files is hashed, so that what the overlay records
+    about a file describes the file as it will ship, rather than a state that
+    existed only on the machine that built it.
+    """
+    return {
+        sysvars.name: _patch_sysconfig_vars_json(sysvars)["dropped_keys"],
+        makefile.name: _drop_assignments(makefile, r"^{key}[ \t]*=[ \t]*(?P<value>.*)$"),
+        sysdata.name: _drop_assignments(sysdata, r"'{key}': '(?P<value>[^']*)'"),
+    }
+
+
+def _drop_assignments(path: Path, pattern: str) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    dropped: list[str] = []
+    for key, replacement in HOST_DISCOVERED_VARS.items():
+        match = re.search(pattern.format(key=re.escape(key)), text, re.M)
+        if match is None or match.group("value") == replacement:
+            continue
+        start, end = match.span("value")
+        text = text[:start] + replacement + text[end:]
+        dropped.append(key)
+    if dropped:
+        path.write_text(text, encoding="utf-8")
+    return sorted(dropped)
+
+
+def _patch_sysconfig_vars_json(path: Path) -> dict[str, Any]:
+    """Drop what this file recorded about the machine that built it.
 
     Everything else is preserved byte for byte, which is checked rather than
     assumed: the payload is re-serialised untouched first and has to reproduce
@@ -424,8 +454,8 @@ def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -
     if missing:
         raise RuntimeError(f"upstream consumer metadata is incomplete: {missing}")
 
+    host_discovered = drop_host_discovered_values(sysdata, sysvars, makefile)
     sysvars_before = sha256_path(sysvars)
-    sysvars_row = _patch_sysconfig_vars_json(sysvars)
     sysdata_row = _overlay_sysconfigdata(sysdata, layout)
     makefile_row = _patch_makefile(makefile, layout)
     python_config_row = _strip_shebang(python_config)
@@ -468,11 +498,12 @@ def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -
         "profile": PROFILE,
         "producer_provenance_preserved": True,
         "sysconfigdata": {"path": sysdata.relative_to(install).as_posix(), **sysdata_row},
+        "host_discovered_values_dropped": host_discovered,
         "sysconfig_vars_json": {
             "path": sysvars.relative_to(install).as_posix(),
             "before_sha256": sysvars_before,
             "after_sha256": sha256_path(sysvars),
-            **sysvars_row,
+            "mutation": "preserved byte-exact",
         },
         "makefile": makefile_row,
         "python_config": python_config_row,
