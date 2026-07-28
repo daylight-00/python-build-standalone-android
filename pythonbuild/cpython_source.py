@@ -19,8 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from .archive import newest_member_mtime, safe_extract_tar
-from .assemble import PrefixSource
-from .dependencies import build_dependencies
+from .assemble import BUILD_PLACEHOLDER, TOOLCHAIN_PLACEHOLDER, PrefixSource
+from .dependencies import bare_toolchain_override, build_dependencies, file_prefix_map_override
 from .downloads import acquire
 from .elf import android_note, elf_objects
 from .targets import Build
@@ -56,8 +56,10 @@ def build_cpython(
     android_api: int,
     host: str,
     tzpath: str | None,
+    toolchain_bin: Path,
     readelf: str,
     source_date_epoch: int,
+    host_paths: tuple[tuple[str, str], ...],
     lock_path: Path,
 ) -> tuple[Path, dict[str, Any]]:
     """Cross-compile CPython against an already-built dependency prefix."""
@@ -80,9 +82,22 @@ def build_cpython(
     prefix.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(dependency_prefix, prefix, symlinks=True)
 
+    # The same overrides, for the same reasons, applied to the interpreter's own
+    # environment script: the recipes' copy of it came from here.
+    applied_overrides = [
+        override.apply(source / "Android")
+        for override in (file_prefix_map_override(host_paths), bare_toolchain_override())
+    ]
+
     environment = dict(os.environ)
     environment["ANDROID_API_LEVEL"] = str(android_api)
     environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
+    # The tools are named without their directory, so the directory has to be on
+    # PATH. The environment script puts it there for the steps that source it, but
+    # `make` deliberately does not source it — upstream relies on configure having
+    # captured the absolute paths in the Makefile, and those are exactly what this
+    # build does not want recorded.
+    environment["PATH"] = os.pathsep.join([str(toolchain_bin), environment.get("PATH", "")])
 
     configure_args = [f"--with-tzpath={tzpath}"] if tzpath else []
 
@@ -108,6 +123,7 @@ def build_cpython(
         "host": host,
         "configure_args": configure_args,
         "source_date_epoch": source_date_epoch,
+        "overrides": applied_overrides,
         "driver": ANDROID_DRIVER,
         "objects": verify_prefix(prefix, android_api=android_api, readelf=readelf),
     }
@@ -214,6 +230,13 @@ def prepare_source_prefix(
     )
     source_date_epoch = newest_member_mtime(source_archive)
 
+    # Every directory of this machine's that a build could record. The workspace
+    # covers both the dependency and the interpreter trees under it.
+    host_paths = (
+        (str(workspace), BUILD_PLACEHOLDER),
+        (str(toolchain.ndk), TOOLCHAIN_PLACEHOLDER),
+    )
+
     dependency_prefix, dependencies = build_dependencies(
         workspace=workspace / "dependencies",
         cache=cache,
@@ -222,6 +245,7 @@ def prepare_source_prefix(
         host=build.triple,
         readelf=str(toolchain.readelf),
         source_date_epoch=source_date_epoch,
+        host_paths=host_paths,
     )
     built_prefix, cpython = build_cpython(
         workspace=workspace / "cpython",
@@ -230,8 +254,10 @@ def prepare_source_prefix(
         android_api=build.android_api.level,
         host=build.triple,
         tzpath=runtime_data.get("tzpath"),
+        toolchain_bin=toolchain.readelf.parent,
         readelf=str(toolchain.readelf),
         source_date_epoch=source_date_epoch,
+        host_paths=host_paths,
         lock_path=build.input_lock_path(),
     )
 
@@ -253,6 +279,7 @@ def prepare_source_prefix(
         },
         retained=None,
         needs_launcher=False,
+        host_paths=host_paths,
     )
 
 

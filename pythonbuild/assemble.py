@@ -46,6 +46,12 @@ RECORDS = "build/records"
 LICENSES = "licenses"
 LICENSE_SOURCE = ROOT / "licenses"
 
+# What a build tree is called once it is inside an archive. The same string is
+# given to the compiler as -ffile-prefix-map, so generated text and compiled
+# debug information agree, and neither carries the machine that produced them.
+BUILD_PLACEHOLDER = "/build"
+TOOLCHAIN_PLACEHOLDER = "/ndk"
+
 
 @dataclass(frozen=True)
 class PrefixSource:
@@ -63,6 +69,10 @@ class PrefixSource:
     record: dict[str, Any]
     retained: Path | None = None
     needs_launcher: bool = True
+    # Directories this build wrote in. None of them may be named anywhere inside
+    # the finished archive: a consumer does not have them, and two hosts with
+    # different ones would produce different bytes.
+    host_paths: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -127,6 +137,70 @@ def _install_licenses(install: Path) -> dict[str, Any]:
         "root": LICENSES,
         "manifest": f"{LICENSES}/{manifest.name}",
         "files": rows,
+    }
+
+
+def _normalize_host_paths(root: Path, host_paths: tuple[tuple[str, str], ...]) -> dict[str, Any]:
+    """Rewrite this machine's directories to placeholders, then prove none remain.
+
+    The path turns up in more places than a list of variables would cover:
+    ``CONFIG_ARGS``, ``abs_srcdir``, the ``CONFIGURE_*`` flags, per-module
+    compile flags, ``_PYTHON_PROJECT_BASE``. Rewriting the root instead of
+    enumerating its users keeps the shape of the provenance — which configure
+    arguments were used, which include directories — while dropping the part
+    that belongs to one machine.
+
+    Upstream's own build paths in ``CONFIG_ARGS`` are left alone. There they are
+    the producer's provenance and they are the same for everyone who consumes
+    that package.
+    """
+    if not host_paths:
+        return {"checked": False}
+
+    # Longest first, so a path nested inside another is rewritten as itself.
+    ordered = sorted(host_paths, key=lambda pair: len(pair[0]), reverse=True)
+    rewritten: list[str] = []
+    scanned = 0
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.is_symlink() or is_elf(path):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        scanned += 1
+        replaced = text
+        for candidate, placeholder in ordered:
+            replaced = replaced.replace(candidate, placeholder)
+        if replaced != text:
+            path.write_text(replaced, encoding="utf-8")
+            rewritten.append(path.relative_to(root).as_posix())
+
+    offenders = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        try:
+            content = path.read_bytes()
+        except OSError:
+            continue
+        if any(candidate.encode() in content for candidate, _ in ordered):
+            offenders.append(path.relative_to(root).as_posix())
+    if offenders:
+        raise RuntimeError(
+            f"a host directory is still named inside the archive: {offenders[:5]}\n"
+            f"  looked for: {[candidate for candidate, _ in ordered]}\n"
+            f"Text members are rewritten. A compiled object means the compiler was not "
+            f"given -ffile-prefix-map for that tree; a string inside one means something "
+            f"recorded its command line, which only building it differently can fix."
+        )
+    # This record ships inside the archive, so it names the placeholders rather
+    # than the directories they replaced: writing those down would put back what
+    # the pass just removed, and after the scan, where nothing would catch it.
+    return {
+        "placeholders": sorted({placeholder for _, placeholder in ordered}),
+        "text_members_scanned": scanned,
+        "text_members_rewritten": rewritten,
     }
 
 
@@ -246,6 +320,11 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
             readelf=str(context.toolchain.readelf),
         )
         write_json(python_root / "PYTHON.json", python_json)
+
+        write_json(
+            records / "host-paths.json",
+            {"schema_version": 1, **_normalize_host_paths(python_root, source.host_paths)},
+        )
 
         manifest_path = records / "member-manifest.json"
         excluded = {f"python/{RECORDS}/member-manifest.json"}

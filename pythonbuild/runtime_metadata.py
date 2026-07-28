@@ -125,6 +125,9 @@ def _literal_updates(layout: Layout) -> dict[str, str]:
         "BLDLIBRARY": f"-L /install/lib -lpython{layout.python_mm}",
         "LIBPYTHON": "",
         "SHELL": "sh -e",
+        # Resolved from the build machine's PATH, so it names whichever mkdir that
+        # machine happened to find. The Makefile overlay drops it for the same reason.
+        "MKDIR_P": "mkdir -p",
         "ANDROID_METADATA_PROFILE": PROFILE,
         "ANDROID_CROSS_BUILD_SDK": "not-bundled",
     }
@@ -222,6 +225,23 @@ def _patch_makefile(path: Path, layout: Layout) -> dict[str, Any]:
         "AR": "llvm-ar",
         "ARFLAGS": "rcs",
         "SHELL": "sh -e",
+        # These name the tree the interpreter was built in, which no consumer of
+        # a distribution has. Left as configure wrote them they publish the build
+        # machine's layout — upstream's own package ships its release runner's
+        # paths this way — and for a build of our own they would make two hosts
+        # produce different bytes. Emptied rather than pointed somewhere
+        # plausible, so a rule that needs them fails instead of silently reading
+        # the wrong tree.
+        "abs_srcdir": "",
+        "abs_builddir": "",
+        "srcdir": ".",
+        # configure records the flags it was handed, absolute include paths and
+        # all. The overlay already states the flags a consumer should use.
+        "CONFIGURE_CFLAGS": "$(CFLAGS)",
+        "CONFIGURE_CPPFLAGS": "",
+        "CONFIGURE_LDFLAGS": "$(LDFLAGS)",
+        # Resolved from the build machine's PATH, so it differs between hosts.
+        "MKDIR_P": "mkdir -p",
         "CFLAGS": CFLAGS,
         "PY_CFLAGS": "$(CFLAGS)",
         "CPPFLAGS": "",
@@ -335,6 +355,54 @@ def relative_shell_wrapper(python_mm: str, arguments: str) -> str:
     )
 
 
+HOST_DISCOVERED_VARS = {
+    # configure resolved this by searching the build machine's PATH, so it names
+    # whichever mkdir that machine happened to find first. The Makefile and
+    # sysconfigdata overlays drop it for the same reason.
+    "MKDIR_P": "mkdir -p",
+    # The build interpreter's own user base, which is the build user's home.
+    "userbase": "",
+}
+
+
+def _patch_sysconfig_vars_json(path: Path) -> dict[str, Any]:
+    """Drop the values this file recorded about the machine that built it.
+
+    Both are recomputed by ``sysconfig`` at runtime, so what is stored here is
+    inert; it is dropped because a distribution should not carry the build
+    machine's directories, and because two hosts would otherwise disagree.
+
+    Everything else is preserved byte for byte, which is checked rather than
+    assumed: the payload is re-serialised untouched first and has to reproduce
+    the file. If CPython ever writes it differently, that fails here instead of
+    silently reformatting a file consumers read.
+    """
+    before = path.read_bytes()
+    payload = json.loads(before)
+    if _dump_sysconfig_vars(payload) != before:
+        raise RuntimeError(f"unexpected serialisation of {path.name}; cannot patch it in place")
+
+    values = payload.get("build_time_vars", payload)
+    dropped = {
+        key: values[key]
+        for key, replacement in HOST_DISCOVERED_VARS.items()
+        if key in values and values[key] != replacement
+    }
+    for key in dropped:
+        values[key] = HOST_DISCOVERED_VARS[key]
+    path.write_bytes(_dump_sysconfig_vars(payload))
+    return {
+        "mutation": "host-discovered values dropped, everything else byte-exact",
+        "dropped_keys": sorted(dropped),
+    }
+
+
+def _dump_sysconfig_vars(payload: Any) -> bytes:
+    # How CPython writes the file: two-space indent, insertion order, no trailing
+    # newline. Asserted against the input rather than trusted.
+    return json.dumps(payload, indent=2).encode()
+
+
 def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -> dict[str, Any]:
     """Overlay consumer metadata on an install prefix, in place."""
     layout = Layout(python_mm, host_triple)
@@ -357,6 +425,7 @@ def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -
         raise RuntimeError(f"upstream consumer metadata is incomplete: {missing}")
 
     sysvars_before = sha256_path(sysvars)
+    sysvars_row = _patch_sysconfig_vars_json(sysvars)
     sysdata_row = _overlay_sysconfigdata(sysdata, layout)
     makefile_row = _patch_makefile(makefile, layout)
     python_config_row = _strip_shebang(python_config)
@@ -403,7 +472,7 @@ def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -
             "path": sysvars.relative_to(install).as_posix(),
             "before_sha256": sysvars_before,
             "after_sha256": sha256_path(sysvars),
-            "mutation": "preserved-upstream-byte-exact",
+            **sysvars_row,
         },
         "makefile": makefile_row,
         "python_config": python_config_row,

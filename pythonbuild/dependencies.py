@@ -62,8 +62,11 @@ class Override:
                 f"  reason: {self.reason}\n"
                 f"The pinned recipe changed; revisit the override."
             )
+        # Spliced by span rather than substituted: a replacement is literal text,
+        # and `re.sub` would read backslashes and group references in it.
+        start, end = matches[0].span()
         original = matches[0].group(0)
-        target.write_text(re.sub(self.pattern, self.replace, text, flags=re.M), encoding="utf-8")
+        target.write_text(text[:start] + self.replace + text[end:], encoding="utf-8")
         return {
             "path": self.path,
             "was": original,
@@ -100,6 +103,58 @@ def _openssldir_override(openssldir: str) -> Override:
     )
 
 
+def file_prefix_map_override(host_paths: tuple[tuple[str, str], ...]) -> Override:
+    """Keep host directories out of compiled debug information.
+
+    Two of them get in: the build tree, through the file names of everything
+    compiled, and the NDK, through the sysroot include directories recorded in
+    every object's line table. Neither is reachable by a text pass, so two hosts
+    produce different bytes from the same input. The recipe environment assigns
+    CFLAGS rather than appending to it, so the flags have to go in there rather
+    than being passed through.
+    """
+    flags = " ".join(f"-ffile-prefix-map={path}={placeholder}" for path, placeholder in host_paths)
+    return Override(
+        path="android-env.sh",
+        pattern=r'^export CFLAGS="-D__BIONIC_NO_PAGE_SIZE_MACRO"$',
+        replace=f'export CFLAGS="-D__BIONIC_NO_PAGE_SIZE_MACRO {flags}"',
+        reason=(
+            "the build tree and the toolchain location would otherwise be recorded in "
+            "every compiled object's debug information, which nothing downstream can rewrite"
+        ),
+    )
+
+
+def bare_toolchain_override() -> Override:
+    """Name the tools without the directory they happen to live in.
+
+    A build records the command line it was given: OpenSSL writes the compiler
+    invocation into libcrypto as a string, and configure writes it into
+    ``CONFIG_ARGS``. An absolute toolchain path there belongs to the machine that
+    built the distribution, and a string inside a shared object is not something
+    a later pass can rewrite. Found on PATH instead, so the same build works
+    wherever the NDK is installed.
+
+    ``LD`` is left alone. It is the one tool whose bare name is also a host tool's,
+    and it is not recorded anywhere, so making it ambiguous would buy nothing.
+    """
+    return Override(
+        path="android-env.sh",
+        pattern=r'^export CXXFLAGS="\$CFLAGS"$',
+        replace="""export CXXFLAGS="$CFLAGS"
+
+export PATH="$toolchain/bin:$PATH"
+for _tool in AR AS CC CXX NM RANLIB READELF STRIP; do
+    eval "export $_tool=\\${$_tool##*/}"
+done
+unset _tool""",
+        reason=(
+            "an absolute toolchain path is recorded in strings no later pass can "
+            "rewrite: OpenSSL's compiler banner and configure's CONFIG_ARGS"
+        ),
+    )
+
+
 def _acquire_recipes(repository: str, commit: str, destination: Path) -> str:
     if not (destination / ".git").is_dir():
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -107,11 +162,15 @@ def _acquire_recipes(repository: str, commit: str, destination: Path) -> str:
             ["git", "clone", "-q", repository, str(destination)],
             "cloning the recipe repository",
         )
-    run_checked(["git", "-C", str(destination), "checkout", "-q", "--", "."], "recipe reset")
+    _reset(destination)
     run_checked(["git", "-C", str(destination), "checkout", "-q", commit], f"checking out {commit}")
     return run_checked(
         ["git", "-C", str(destination), "rev-parse", "HEAD"], "reading the recipe commit"
     ).stdout.strip()
+
+
+def _reset(repo: Path) -> None:
+    run_checked(["git", "-C", str(repo), "checkout", "-q", "--", "."], "recipe reset")
 
 
 def resolved_compiler(repo: Path, host: str, environment: dict[str, str]) -> str:
@@ -149,6 +208,7 @@ def build_dependencies(
     host: str,
     readelf: str,
     source_date_epoch: int,
+    host_paths: tuple[tuple[str, str], ...],
     lock_path: Path = RECIPE_LOCK,
 ) -> tuple[Path, dict[str, Any]]:
     """Build every dependency from source and merge them into one prefix."""
@@ -167,14 +227,30 @@ def build_dependencies(
     environment["ANDROID_API_LEVEL"] = str(android_api)
     environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
 
-    # One revision, so the overrides are applied once and every component is
-    # built the same way.
+    # One recipe revision, so every component is built the same way. The
+    # overrides are not identical for every component: OpenSSL needs one the
+    # others do not.
     openssldir = next((c["openssldir"] for c in lock["components"] if c.get("openssldir")), None)
-    overrides = [_ndk_override(ndk_revision)]
-    if openssldir:
-        overrides.append(_openssldir_override(openssldir))
-    applied = [override.apply(repo) for override in overrides]
+    prefix_map = file_prefix_map_override(host_paths)
 
+    def overrides_for(name: str) -> list[Override]:
+        overrides = [_ndk_override(ndk_revision), bare_toolchain_override()]
+        # Every component but OpenSSL: their static objects are linked into
+        # extension modules and carry host directories in their debug
+        # information. OpenSSL writes the whole compiler command line into
+        # libcrypto as a string, so a flag naming the path it exists to hide
+        # would put that path into the binary, where nothing can rewrite it.
+        # Its own objects carry no debug information to protect.
+        if name != "openssl":
+            overrides.append(prefix_map)
+        elif openssldir:
+            overrides.append(_openssldir_override(openssldir))
+        return overrides
+
+    # The compiler is resolved from the patched environment script, since the NDK
+    # revision it names is one of the things being overridden.
+    for override in overrides_for("probe"):
+        override.apply(repo)
     compiler = resolved_compiler(repo, host, environment)
     if compiler != f"{host}{android_api}-clang":
         raise RuntimeError(
@@ -183,8 +259,13 @@ def build_dependencies(
         )
 
     records: list[dict[str, Any]] = []
+    applied: dict[str, list[dict[str, Any]]] = {}
     for component in lock["components"]:
         name, version = component["name"], component["version"]
+        # Reset and re-apply per component: the overrides differ for OpenSSL, and
+        # the exactly-once guard would not match an already-patched file.
+        _reset(repo)
+        applied[name] = [override.apply(repo) for override in overrides_for(name)]
 
         # The recipes fetch their sources with wget and no checksum. Placing the
         # verified file where the recipe expects it means wget finds it already
