@@ -6,10 +6,10 @@ build target tag:
 build-reproducible target tag:
   #!/usr/bin/env bash
   set -euxo pipefail
-  rm -rf build build-reproducibility-check
-  uv run ./build.py --target {{target}} --tag {{tag}} --output-dir build
-  uv run ./build.py --target {{target}} --tag {{tag}} --output-dir build-reproducibility-check
-  diff build/SHA256SUMS build-reproducibility-check/SHA256SUMS
+  rm -rf dist dist-second-build
+  uv run ./build.py --target {{target}} --tag {{tag}} --output-dir dist
+  uv run ./build.py --target {{target}} --tag {{tag}} --output-dir dist-second-build
+  diff dist/SHA256SUMS dist-second-build/SHA256SUMS
   echo "byte identical across runs"
 
 # Generate the uv download-metadata catalog from a build receipt.

@@ -1,8 +1,6 @@
 /build/
-/build-*/
-/work/
-/build-reproducibility-check/
 /dist/
+/dist-*/
 /downloads/
 /.venv/
 __pycache__/

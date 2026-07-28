@@ -38,11 +38,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--target", required=True, help="triple or triple:build-option from ci-targets.yaml"
     )
     parser.add_argument("--tag", required=True, help="release tag, e.g. 20260727")
-    parser.add_argument("--output-dir", default="build", type=Path)
+    parser.add_argument("--output-dir", default="dist", type=Path)
     parser.add_argument("--cache", default=DEFAULT_CACHE, type=Path)
     parser.add_argument(
-        "--work-dir",
-        default=Path("work"),
+        "--build-dir",
+        default=Path("build"),
         type=Path,
         help="where source builds happen; kept between runs so the build interpreter is reused",
     )
@@ -87,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
         source = prepare_source_prefix(
             build=build,
             toolchain=context.toolchain,
-            workspace=args.work_dir.resolve() / build.artifact_infix,
+            workspace=args.build_dir.resolve() / build.artifact_infix,
             cache=args.cache,
         )
         print("==> assembling full", flush=True)

@@ -25,7 +25,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", required=True, help="triple or triple:build-option")
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--build-dir", default="build", type=Path)
+    parser.add_argument("--dist-dir", default="dist", type=Path)
     parser.add_argument("--output-dir", default="dist", type=Path)
     parser.add_argument("--repository", default=DEFAULT_REPOSITORY)
     parser.add_argument(
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     build = get_build(args.target)
 
     pattern = f"*+{args.tag}-{build.artifact_infix}.build.json"
-    receipts = sorted(args.build_dir.glob(pattern))
+    receipts = sorted(args.dist_dir.glob(pattern))
     if len(receipts) != 1:
         print(
             f"expected exactly one build receipt matching {pattern}, "

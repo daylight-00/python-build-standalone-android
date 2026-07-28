@@ -25,7 +25,10 @@ from typing import Any
 from .utils import read_json, sha256_path, sha256_text, write_json
 
 CANONICAL_HEADER = "# system configuration generated and used by the sysconfig module"
-PRODUCER_ROOTS = ("/Users/runner/", "/home/runner/", "/data/data/com.termux/", "/usr/local")
+# Where the producers of the inputs this project repackages happen to build, plus
+# configure's default prefix. A consumer-facing file naming one of these is a bug:
+# it would send a consumer to a directory that only the producer has.
+PRODUCER_ROOTS = ("/Users/runner/", "/home/runner/", "/usr/local")
 PROFILE = "upstream-preserved-minimal-consumer-overlay"
 
 PRESERVED_PRODUCER_KEYS = (
@@ -125,9 +128,6 @@ def _literal_updates(layout: Layout) -> dict[str, str]:
         "BLDLIBRARY": f"-L /install/lib -lpython{layout.python_mm}",
         "LIBPYTHON": "",
         "SHELL": "sh -e",
-        # Resolved from the build machine's PATH, so it names whichever mkdir that
-        # machine happened to find. The Makefile overlay drops it for the same reason.
-        "MKDIR_P": "mkdir -p",
         "ANDROID_METADATA_PROFILE": PROFILE,
         "ANDROID_CROSS_BUILD_SDK": "not-bundled",
     }
@@ -240,8 +240,6 @@ def _patch_makefile(path: Path, layout: Layout) -> dict[str, Any]:
         "CONFIGURE_CFLAGS": "$(CFLAGS)",
         "CONFIGURE_CPPFLAGS": "",
         "CONFIGURE_LDFLAGS": "$(LDFLAGS)",
-        # Resolved from the build machine's PATH, so it differs between hosts.
-        "MKDIR_P": "mkdir -p",
         "CFLAGS": CFLAGS,
         "PY_CFLAGS": "$(CFLAGS)",
         "CPPFLAGS": "",

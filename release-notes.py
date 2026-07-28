@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render release notes from the build receipts of a release.
 
-    ./release-notes.py --tag 20260727 --build-dir incoming
+    ./release-notes.py --tag 20260727 --dist-dir incoming
 
 The minimum Android API is stated per build, and a change from the previous
 release is called out. Neither API level is chosen by this project, so a floor
@@ -26,7 +26,7 @@ REPOSITORY = "daylight-00/python-build-standalone-android"
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--build-dir", default="build", type=Path)
+    parser.add_argument("--dist-dir", default="dist", type=Path)
     parser.add_argument("--previous", type=Path, help="a previous release's notes metadata")
     parser.add_argument("--repository", default=REPOSITORY)
     parser.add_argument("-o", "--output", type=Path)
@@ -96,9 +96,9 @@ def render(receipts: list[dict[str, Any]], tag: str, repository: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    paths = sorted(args.build_dir.rglob(f"*+{args.tag}-*.build.json"))
+    paths = sorted(args.dist_dir.rglob(f"*+{args.tag}-*.build.json"))
     if not paths:
-        print(f"no build receipts for {args.tag} under {args.build_dir}", file=sys.stderr)
+        print(f"no build receipts for {args.tag} under {args.dist_dir}", file=sys.stderr)
         return 2
     receipts = [read_json_object(path) for path in paths]
 

@@ -93,9 +93,9 @@ jobs:
           (
             umask 002
             uv run ./build.py --target ${{ matrix.build }} \
-              --tag ${{ inputs.tag }} --output-dir build-reproducibility-check
+              --tag ${{ inputs.tag }} --output-dir dist-second-build
           )
-          diff build/SHA256SUMS build-reproducibility-check/SHA256SUMS
+          diff dist/SHA256SUMS dist-second-build/SHA256SUMS
 
       # CI has no Android runner, so the one check that matters most is produced
       # on a device and committed. It has to cover these exact bytes.
@@ -109,10 +109,10 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            build/*.tar.zst
-            build/*.tar.gz
-            build/*.json
+            dist/*.tar.zst
+            dist/*.tar.gz
             dist/*.json
+            dist/SHA256SUMS
           if-no-files-found: error
 
   publish:
@@ -148,7 +148,7 @@ jobs:
       - name: Render the release notes
         run: |
           uv sync
-          uv run ./release-notes.py --tag ${{ inputs.tag }} --build-dir incoming \
+          uv run ./release-notes.py --tag ${{ inputs.tag }} --dist-dir incoming \
             -o dist/RELEASE_NOTES.md
           cat dist/RELEASE_NOTES.md
 

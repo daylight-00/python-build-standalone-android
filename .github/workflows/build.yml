@@ -76,9 +76,9 @@ jobs:
           (
             umask 002
             uv run ./build.py --target ${{ matrix.build }} \
-              --tag ${{ steps.pins.outputs.tag }} --output-dir build-reproducibility-check
+              --tag ${{ steps.pins.outputs.tag }} --output-dir dist-second-build
           )
-          diff build/SHA256SUMS build-reproducibility-check/SHA256SUMS
+          diff dist/SHA256SUMS dist-second-build/SHA256SUMS
           echo "byte identical across runs and umasks"
 
       - name: Generate the uv catalog
@@ -90,8 +90,7 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            build/*.tar.zst
-            build/*.tar.gz
-            build/*.json
-            build/SHA256SUMS
+            dist/*.tar.zst
+            dist/*.tar.gz
             dist/*.json
+            dist/SHA256SUMS

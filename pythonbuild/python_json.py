@@ -17,8 +17,6 @@ from .runtime_metadata import Layout
 from .targets import Build
 from .utils import read_json
 
-PRODUCER_PATH_MARKERS = ("/Users/runner/", "/home/runner/", "/data/data/com.termux/")
-
 # The SPDX identifiers upstream uses for CPython itself.
 CPYTHON_LICENSES = ["Python-2.0", "CNRI-Python"]
 
@@ -52,11 +50,14 @@ def _as_string(value: Any) -> str:
 
 
 def _sanitize(value: str) -> str:
-    """Rewrite prefix placeholders and drop tokens naming a producer path."""
-    value = value.replace("/usr/local", "install").replace("${prefix}", "install")
-    tokens = re.findall(r"(?:'[^']*'|\"[^\"]*\"|\S+)", value)
-    kept = [token for token in tokens if not any(m in token for m in PRODUCER_PATH_MARKERS)]
-    return " ".join(kept)
+    """Rewrite the producer's install prefix to the one a consumer will see.
+
+    Only the prefix. The producer's own directories stay: they are the same for
+    everyone who consumes that package, the interpreter reports them at runtime
+    from ``sysconfigdata`` regardless, and upstream published them itself. Dropping
+    them here made this file disagree with the one consumers actually read.
+    """
+    return value.replace("/usr/local", "install").replace("${prefix}", "install")
 
 
 def _config_vars(raw: dict[str, Any], layout: Layout, build: Build) -> dict[str, str]:
