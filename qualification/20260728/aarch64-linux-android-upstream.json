@@ -2,13 +2,13 @@
   "bound_artifacts": [
     {
       "filename": "cpython-3.14.6+20260728-aarch64-linux-android-upstream-full.tar.zst",
-      "sha256": "128015cf62f317ea62ed6a7d703acc6362cc5d479b5a11f76f37ed7ca568e4b5",
-      "size_bytes": 39427687
+      "sha256": "90c8a704c67d4570cdb3bc69877cab61538bcb8448f36a63f2ec947da134dcc7",
+      "size_bytes": 39422415
     },
     {
       "filename": "cpython-3.14.6+20260728-aarch64-linux-android-upstream-install_only.tar.gz",
-      "sha256": "c8d7133142068f2adfcd13982abbb53e7dadc014d36e3a343d8184e596681ba9",
-      "size_bytes": 23855368
+      "sha256": "00602b1935829512c897add9828ded8406a63daa3ba84377a08d3f0ef53801f1",
+      "size_bytes": 23855356
     }
   ],
   "checks": {
@@ -35,14 +35,14 @@
     },
     "identity": {
       "android_api_level": 24,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/runtime/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/runtime/python/bin/python3.14",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/runtime/python/bin/python3.14",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": true,
       "platform": "android-24-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/runtime/python",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/runtime/python",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
     },
@@ -52,18 +52,18 @@
     "pip": {
       "pass": true,
       "stderr": "",
-      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-20n_g912/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
+      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
     },
     "relocated_identity": {
       "android_api_level": 24,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/relocated/a/deeper/path/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/relocated/a/deeper/path/python/bin/python3.14",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/relocated/a/deeper/path/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/relocated/a/deeper/path/python/bin/python3.14",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": true,
       "platform": "android-24-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/relocated/a/deeper/path/python",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/relocated/a/deeper/path/python",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
     },
@@ -92,7 +92,7 @@
       "pass": true,
       "returncode": 0,
       "stderr": "",
-      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/runtime/python"
+      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/runtime/python"
     },
     "venv": {
       "pass": true,
@@ -101,14 +101,14 @@
     },
     "venv_identity": {
       "android_api_level": 24,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/runtime/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/state/venv/bin/python",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/state/venv/bin/python",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": false,
       "platform": "android-24-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-20n_g912/state/venv",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-_u8vjs6j/state/venv",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
     }
@@ -124,8 +124,8 @@
   },
   "executed_artifact": {
     "filename": "cpython-3.14.6+20260728-aarch64-linux-android-upstream-install_only_stripped.tar.gz",
-    "sha256": "9faac4c0dd96de3af4a492179d1b95f973d78816cc22e8ccce5ac65718c8cf90",
-    "size_bytes": 23848280
+    "sha256": "359cb572aec375517fb2969848699d9eeda8a268eab3a0fe0eef45f8a8d4716b",
+    "size_bytes": 23848251
   },
   "expectations": {
     "builtin_runtime_data": false
