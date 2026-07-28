@@ -1,0 +1,139 @@
+{
+  "bound_artifacts": [
+    {
+      "filename": "cpython-3.14.6+20260729-aarch64-linux-android-upstream-full.tar.zst",
+      "sha256": "64e362d8137b3d3f7cf325b55139177284014e5453d365572c8749fe344c1c42",
+      "size_bytes": 39415694
+    },
+    {
+      "filename": "cpython-3.14.6+20260729-aarch64-linux-android-upstream-install_only.tar.gz",
+      "sha256": "f4212cb123ce9ba1b029ad558bec8ee6bdf6befb6ea20d2a7610d377b46d1325",
+      "size_bytes": 23855348
+    }
+  ],
+  "checks": {
+    "dlopen": {
+      "engines-3/afalg.so": "pass",
+      "engines-3/capi.so": "pass",
+      "engines-3/loader_attic.so": "pass",
+      "engines-3/padlock.so": "pass",
+      "libcrypto.so": "pass",
+      "libcrypto_python.so": "pass",
+      "libpython3.14.so": "pass",
+      "libpython3.so": "pass",
+      "libsqlite3.so": "pass",
+      "libsqlite3_python.so": "pass",
+      "libssl.so": "pass",
+      "libssl_python.so": "pass",
+      "ossl-modules/legacy.so": "pass",
+      "pass": true
+    },
+    "extensions": {
+      "count": 67,
+      "failures": {},
+      "pass": true
+    },
+    "identity": {
+      "android_api_level": 24,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/runtime/python/bin/python3.14",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": true,
+      "platform": "android-24-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/runtime/python",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    },
+    "ld_library_path_required": {
+      "pass": true
+    },
+    "pip": {
+      "pass": true,
+      "stderr": "",
+      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
+    },
+    "relocated_identity": {
+      "android_api_level": 24,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/relocated/a/deeper/path/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/relocated/a/deeper/path/python/bin/python3.14",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": true,
+      "platform": "android-24-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/relocated/a/deeper/path/python",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    },
+    "runtime_data": {
+      "ca_certificate_count": 0,
+      "ca_error": null,
+      "openssl_cafile": "/usr/local/ssl/cert.pem",
+      "openssl_cafile_present": false,
+      "openssl_capath": "/usr/local/ssl/certs",
+      "openssl_capath_present": false,
+      "pass": true,
+      "tzpath_configured": "/usr/share/zoneinfo:/usr/lib/zoneinfo:/usr/share/lib/zoneinfo:/etc/zoneinfo",
+      "tzpath_present": [],
+      "tzpath_runtime": [
+        "/usr/share/zoneinfo",
+        "/usr/lib/zoneinfo",
+        "/usr/share/lib/zoneinfo",
+        "/etc/zoneinfo"
+      ],
+      "zones": {
+        "America/New_York": "ZoneInfoNotFoundError: 'No time zone found with key America/New_York'",
+        "Asia/Seoul": "ZoneInfoNotFoundError: 'No time zone found with key Asia/Seoul'"
+      }
+    },
+    "subprocess": {
+      "pass": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/runtime/python"
+    },
+    "venv": {
+      "pass": true,
+      "stderr": "",
+      "stdout": ""
+    },
+    "venv_identity": {
+      "android_api_level": 24,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/state/venv/bin/python",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": false,
+      "platform": "android-24-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-i5y93a9f/state/venv",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    }
+  },
+  "device": {
+    "abi": "arm64-v8a",
+    "android_release": "16",
+    "api_level": "36",
+    "context": "termux",
+    "machine": "aarch64",
+    "model": "SM-S908N",
+    "page_size": 4096
+  },
+  "executed_artifact": {
+    "filename": "cpython-3.14.6+20260729-aarch64-linux-android-upstream-install_only_stripped.tar.gz",
+    "sha256": "67e71fa07dcd364c7942694247eb8c1a54757f7fe7f1b2edae8608f0a5cc6580",
+    "size_bytes": 23848253
+  },
+  "expectations": {
+    "builtin_runtime_data": false
+  },
+  "receipt_kind": "android-device-qualification",
+  "schema_version": 1,
+  "verdict": {
+    "failures": [],
+    "pass": true
+  }
+}
