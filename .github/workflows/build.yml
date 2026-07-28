@@ -19,15 +19,19 @@ jobs:
   build:
     name: ${{ matrix.build }}
     runs-on: ubuntu-latest
+    # The source build compiles CPython and six dependencies twice, once to
+    # build and once to prove the result is reproducible.
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Only the upstream-prebuilt build is implemented so far. `artifact`
-          # exists because an artifact name cannot contain the colon that
-          # separates a triple from its build option.
+          # `artifact` exists because an artifact name cannot contain the
+          # colon that separates a triple from its build option.
           - build: aarch64-linux-android:upstream
             artifact: aarch64-linux-android-upstream
+          - build: aarch64-linux-android
+            artifact: aarch64-linux-android
     steps:
       - uses: actions/checkout@v6
         with:
@@ -52,6 +56,8 @@ jobs:
         run: |
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;${{ steps.pins.outputs.ndk }}"
 
+      # The source build's workspace reaches a couple of gigabytes and is
+      # rebuilt from scratch each run anyway; only the pinned inputs are cached.
       - name: Cache pinned downloads
         uses: actions/cache@v4
         with:
