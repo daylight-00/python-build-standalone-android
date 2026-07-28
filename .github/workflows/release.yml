@@ -23,6 +23,15 @@ on:
 env:
   FORCE_COLOR: 1
 
+# Two releases of one tag must never race: the second would find assets already
+# uploaded and a catalog pointing at a half-finished release. Never cancelled
+# mid-flight, because a release interrupted between upload and publish is worse
+# than one that waits.
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+# Nothing by default. The jobs that write name what they write and why.
 permissions: {}
 
 jobs:
@@ -31,7 +40,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     steps:
-      - run: echo "Release of ${{ inputs.sha }} as ${{ inputs.tag }} approved"
+      - env:
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
+        run: echo "Release of $SHA as $TAG approved"
 
   build:
     name: build ${{ matrix.build }}
@@ -51,12 +63,12 @@ jobs:
           - build: aarch64-linux-android
             artifact: aarch64-linux-android
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.sha }}
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
 
@@ -77,35 +89,43 @@ jobs:
       # The source build's workspace reaches a couple of gigabytes and is
       # rebuilt from scratch each run anyway; only the pinned inputs are cached.
       - name: Cache pinned downloads
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: downloads
           key: downloads-${{ hashFiles('config/**/*.json') }}
 
       - name: Build
-        run: uv run ./build.py --target ${{ matrix.build }} --tag ${{ inputs.tag }}
+        env:
+          TAG: ${{ inputs.tag }}
+        run: uv run ./build.py --target ${{ matrix.build }} --tag "$TAG"
 
       # The second build deliberately uses a different umask: repeating a build
       # under identical conditions would not have caught the directory and
       # record modes leaking in from the caller.
       - name: Verify reproducibility
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           (
             umask 002
             uv run ./build.py --target ${{ matrix.build }} \
-              --tag ${{ inputs.tag }} --output-dir dist-second-build
+              --tag "$TAG" --output-dir dist-second-build
           )
           diff dist/*.SHA256SUMS dist-second-build/*.SHA256SUMS
 
       # CI has no Android runner, so the one check that matters most is produced
       # on a device and committed. It has to cover these exact bytes.
       - name: Device qualification gate
-        run: uv run ./check-qualification.py --target ${{ matrix.build }} --tag ${{ inputs.tag }}
+        env:
+          TAG: ${{ inputs.tag }}
+        run: uv run ./check-qualification.py --target ${{ matrix.build }} --tag "$TAG"
 
       - name: Generate the uv catalog
-        run: uv run ./generate-catalog.py --target ${{ matrix.build }} --tag ${{ inputs.tag }}
+        env:
+          TAG: ${{ inputs.tag }}
+        run: uv run ./generate-catalog.py --target ${{ matrix.build }} --tag "$TAG"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact }}
           path: |
@@ -121,18 +141,20 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
+      # The release itself, and the latest-release branch machines resolve from.
       contents: write
+      # Signing the provenance attestation for every published archive.
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.sha }}
           persist-credentials: true
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: incoming
 
@@ -146,15 +168,17 @@ jobs:
           cat SHA256SUMS
 
       - name: Render the release notes
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           uv sync
-          uv run ./release-notes.py --tag ${{ inputs.tag }} --dist-dir incoming \
+          uv run ./release-notes.py --tag "$TAG" --dist-dir incoming \
             -o dist/RELEASE_NOTES.md
           cat dist/RELEASE_NOTES.md
 
       - name: Generate attestations
         if: ${{ !inputs.dry-run }}
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: |
             dist/*.tar.zst
@@ -164,13 +188,15 @@ jobs:
         if: ${{ !inputs.dry-run }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
         run: |
-          gh release create "${{ inputs.tag }}" \
-            --target "${{ inputs.sha }}" \
-            --title "${{ inputs.tag }}" \
+          gh release create "$TAG" \
+            --target "$SHA" \
+            --title "$TAG" \
             --draft \
             --notes-file dist/RELEASE_NOTES.md
-          gh release upload "${{ inputs.tag }}" dist/*.tar.zst dist/*.tar.gz \
+          gh release upload "$TAG" dist/*.tar.zst dist/*.tar.gz \
             dist/SHA256SUMS dist/download-metadata*.json
 
       # Only once every asset is uploaded, so the catalogs never point at a
@@ -179,10 +205,13 @@ jobs:
         if: ${{ !inputs.dry-run }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ inputs.tag }}" --draft=false
+          TAG: ${{ inputs.tag }}
+        run: gh release edit "$TAG" --draft=false
 
       - name: Update the latest-release branch
         if: ${{ !inputs.dry-run }}
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -196,11 +225,13 @@ jobs:
           find . -maxdepth 1 -name '*.json' -delete
           cp dist/download-metadata*.json dist/latest-release.json .
           git add -A -- '*.json'
-          git commit -m "chore: publish ${{ inputs.tag }} catalogs"
+          git commit -m "chore: publish $TAG catalogs"
           git push origin latest-release
 
       - name: Dry run summary
         if: ${{ inputs.dry-run }}
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
-          echo "Dry run: everything below would have been published as ${{ inputs.tag }}."
+          echo "Dry run: everything below would have been published as $TAG."
           ls -la dist
