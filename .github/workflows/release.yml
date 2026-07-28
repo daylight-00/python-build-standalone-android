@@ -95,7 +95,7 @@ jobs:
             uv run ./build.py --target ${{ matrix.build }} \
               --tag ${{ inputs.tag }} --output-dir dist-second-build
           )
-          diff dist/SHA256SUMS dist-second-build/SHA256SUMS
+          diff dist/*.SHA256SUMS dist-second-build/*.SHA256SUMS
 
       # CI has no Android runner, so the one check that matters most is produced
       # on a device and committed. It has to cover these exact bytes.
@@ -112,7 +112,7 @@ jobs:
             dist/*.tar.zst
             dist/*.tar.gz
             dist/*.json
-            dist/SHA256SUMS
+            dist/*.SHA256SUMS
           if-no-files-found: error
 
   publish:

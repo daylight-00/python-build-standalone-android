@@ -126,10 +126,14 @@ def main(argv: list[str] | None = None) -> int:
         },
         "checks": checks,
     }
-    receipt_path = context.output_dir / f"{context.stem(full['python_version'])}.build.json"
+    stem = context.stem(full["python_version"])
+    receipt_path = context.output_dir / f"{stem}.build.json"
     write_json(receipt_path, receipt)
 
-    sums = context.output_dir / "SHA256SUMS"
+    # Per build, like the receipt beside it. One shared file would be overwritten
+    # by whichever build ran last, which is how a stale directory came to look
+    # like a current one.
+    sums = context.output_dir / f"{stem}.SHA256SUMS"
     lines = [
         f"{record['artifact']['sha256']}  {record['artifact']['filename']}"
         for record in (full, install_only, stripped)

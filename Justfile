@@ -9,7 +9,7 @@ build-reproducible target tag:
   rm -rf dist dist-second-build
   uv run ./build.py --target {{target}} --tag {{tag}} --output-dir dist
   uv run ./build.py --target {{target}} --tag {{tag}} --output-dir dist-second-build
-  diff dist/SHA256SUMS dist-second-build/SHA256SUMS
+  diff dist/*.SHA256SUMS dist-second-build/*.SHA256SUMS
   echo "byte identical across runs"
 
 # Generate the uv download-metadata catalog from a build receipt.

@@ -78,7 +78,7 @@ jobs:
             uv run ./build.py --target ${{ matrix.build }} \
               --tag ${{ steps.pins.outputs.tag }} --output-dir dist-second-build
           )
-          diff dist/SHA256SUMS dist-second-build/SHA256SUMS
+          diff dist/*.SHA256SUMS dist-second-build/*.SHA256SUMS
           echo "byte identical across runs and umasks"
 
       - name: Generate the uv catalog
@@ -93,4 +93,4 @@ jobs:
             dist/*.tar.zst
             dist/*.tar.gz
             dist/*.json
-            dist/SHA256SUMS
+            dist/*.SHA256SUMS
