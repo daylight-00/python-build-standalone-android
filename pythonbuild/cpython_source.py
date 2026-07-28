@@ -131,7 +131,7 @@ def build_cpython(
         "source_date_epoch": source_date_epoch,
         "overrides": applied_overrides,
         "driver": ANDROID_DRIVER,
-        "objects": verify_prefix(prefix, android_api=android_api, readelf=readelf),
+        "objects": verify_install_prefix(prefix, android_api=android_api, readelf=readelf),
     }
 
 
@@ -294,7 +294,7 @@ def prepare_source_prefix(
     )
 
 
-def verify_prefix(prefix: Path, *, android_api: int, readelf: str) -> dict[str, Any]:
+def verify_install_prefix(prefix: Path, *, android_api: int, readelf: str) -> dict[str, Any]:
     """Every object in the finished prefix must report the requested API level.
 
     The dependencies were already checked when they were built; this catches the

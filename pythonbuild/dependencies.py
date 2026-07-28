@@ -387,15 +387,20 @@ def build_dependencies(
         "source_date_epoch": source_date_epoch,
         "host": host,
         "components": records,
-        "objects": verify_prefix(prefix, android_api=android_api, readelf=readelf),
+        "objects": verify_dependency_prefix(prefix, android_api=android_api, readelf=readelf),
     }
 
 
-def verify_prefix(prefix: Path, *, android_api: int, readelf: str) -> dict[str, Any]:
+def verify_dependency_prefix(prefix: Path, *, android_api: int, readelf: str) -> dict[str, Any]:
     """Every object must report the API level the build claims to target.
 
     The note comes from the binary rather than from the build that produced it,
     so a recipe that quietly ignored the environment is caught here.
+
+    This records more than its counterpart for the finished prefix does: which
+    objects carry no note at all, because a component's static archives do not,
+    and a hash per object, because nothing else in the build pins what a
+    component contributed. A distribution's members are pinned by its manifest.
     """
     objects = elf_objects(prefix)
     if not objects:

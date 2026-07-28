@@ -41,11 +41,11 @@ PRESERVED_PRODUCER_KEYS = (
     "ANDROID_API_LEVEL",
 )
 
-CFLAGS = (
+CONSUMER_CFLAGS = (
     "-fno-strict-overflow -Wsign-compare -Wunreachable-code -DNDEBUG -O2 -Wall "
     "-D__BIONIC_NO_PAGE_SIZE_MACRO"
 )
-LDFLAGS = (
+CONSUMER_LDFLAGS = (
     "-Wl,--build-id=sha1 -Wl,--no-rosegment "
     "-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384"
 )
@@ -95,7 +95,7 @@ def _execute_sysconfigdata(path: Path) -> dict[str, Any]:
 
 def _literal_updates(layout: Layout) -> dict[str, str]:
     """Values that must survive uv's rewrite, as ``/install`` placeholders."""
-    ldshared = "clang -shared " + LDFLAGS
+    ldshared = "clang -shared " + CONSUMER_LDFLAGS
     return {
         "BINDIR": "/install/bin",
         "BINLIBDEST": f"/install/{layout.stdlib}",
@@ -113,18 +113,18 @@ def _literal_updates(layout: Layout) -> dict[str, str]:
         "AR": "llvm-ar",
         "ARFLAGS": "rcs",
         "CCSHARED": "-fPIC",
-        "CFLAGS": CFLAGS,
-        "PY_CFLAGS": CFLAGS,
-        "PY_STDMODULE_CFLAGS": CFLAGS + " -fPIC",
+        "CFLAGS": CONSUMER_CFLAGS,
+        "PY_CFLAGS": CONSUMER_CFLAGS,
+        "PY_STDMODULE_CFLAGS": CONSUMER_CFLAGS + " -fPIC",
         "CPPFLAGS": "",
         "PY_CPPFLAGS": "",
-        "LDFLAGS": LDFLAGS,
-        "PY_LDFLAGS": LDFLAGS,
-        "PY_CORE_LDFLAGS": LDFLAGS,
+        "LDFLAGS": CONSUMER_LDFLAGS,
+        "PY_LDFLAGS": CONSUMER_LDFLAGS,
+        "PY_CORE_LDFLAGS": CONSUMER_LDFLAGS,
         "LDSHARED": ldshared,
         "BLDSHARED": ldshared,
         "LINKCC": "clang",
-        "LDCXXSHARED": "clang++ -shared " + LDFLAGS,
+        "LDCXXSHARED": "clang++ -shared " + CONSUMER_LDFLAGS,
         "BLDLIBRARY": f"-L /install/lib -lpython{layout.python_mm}",
         "LIBPYTHON": "",
         "SHELL": "sh -e",
@@ -240,11 +240,11 @@ def _patch_makefile(path: Path, layout: Layout) -> dict[str, Any]:
         "CONFIGURE_CFLAGS": "$(CFLAGS)",
         "CONFIGURE_CPPFLAGS": "",
         "CONFIGURE_LDFLAGS": "$(LDFLAGS)",
-        "CFLAGS": CFLAGS,
+        "CFLAGS": CONSUMER_CFLAGS,
         "PY_CFLAGS": "$(CFLAGS)",
         "CPPFLAGS": "",
         "PY_CPPFLAGS": "",
-        "LDFLAGS": LDFLAGS,
+        "LDFLAGS": CONSUMER_LDFLAGS,
         "PY_LDFLAGS": "$(LDFLAGS)",
         "PY_CORE_LDFLAGS": "$(LDFLAGS)",
         "LDSHARED": "clang -shared $(LDFLAGS)",
