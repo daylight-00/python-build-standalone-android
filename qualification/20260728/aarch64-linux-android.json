@@ -1,0 +1,115 @@
+{
+  "bound_artifacts": [
+    {
+      "filename": "cpython-3.14.6+20260728-aarch64-linux-android-full.tar.zst",
+      "sha256": "59e4329a1270a5af0c285506709f882b870ffb3314e0a3373483859cf1a98686",
+      "size_bytes": 25485008
+    },
+    {
+      "filename": "cpython-3.14.6+20260728-aarch64-linux-android-install_only.tar.gz",
+      "sha256": "dafcbcda6a67f0ad72491ca56ab4a7ede8ec0fca85d04914b74d0c0dd82bfc99",
+      "size_bytes": 33684181
+    }
+  ],
+  "checks": {
+    "dlopen": {
+      "engines-3/afalg.so": "pass",
+      "engines-3/capi.so": "pass",
+      "engines-3/loader_attic.so": "pass",
+      "engines-3/padlock.so": "pass",
+      "libcrypto.so": "pass",
+      "libcrypto_python.so": "pass",
+      "libpython3.14.so": "pass",
+      "libpython3.so": "pass",
+      "libsqlite3.so": "pass",
+      "libsqlite3_python.so": "pass",
+      "libssl.so": "pass",
+      "libssl_python.so": "pass",
+      "ossl-modules/legacy.so": "pass",
+      "pass": true
+    },
+    "extensions": {
+      "count": 68,
+      "failures": {},
+      "pass": true
+    },
+    "identity": {
+      "android_api_level": 34,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python/bin/python3.14",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": true,
+      "platform": "android-34-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    },
+    "ld_library_path_required": {
+      "pass": true
+    },
+    "pip": {
+      "pass": true,
+      "stderr": "",
+      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
+    },
+    "relocated_identity": {
+      "android_api_level": 34,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/relocated/a/deeper/path/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/relocated/a/deeper/path/python/bin/python3.14",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": true,
+      "platform": "android-34-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/relocated/a/deeper/path/python",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    },
+    "subprocess": {
+      "pass": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python"
+    },
+    "venv": {
+      "pass": true,
+      "stderr": "",
+      "stdout": ""
+    },
+    "venv_identity": {
+      "android_api_level": 34,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/state/venv/bin/python",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": false,
+      "platform": "android-34-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/state/venv",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    }
+  },
+  "device": {
+    "abi": "arm64-v8a",
+    "android_release": "16",
+    "api_level": "36",
+    "context": "termux",
+    "machine": "aarch64",
+    "model": "SM-S908N",
+    "page_size": 4096
+  },
+  "executed_artifact": {
+    "filename": "cpython-3.14.6+20260728-aarch64-linux-android-install_only_stripped.tar.gz",
+    "sha256": "f9cf42d3144f782b9265aa49ce4e431f5ccda6a8af47ad1c7c0d74924099df94",
+    "size_bytes": 21331652
+  },
+  "receipt_kind": "android-device-qualification",
+  "schema_version": 1,
+  "verdict": {
+    "failures": [],
+    "pass": true
+  }
+}

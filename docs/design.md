@@ -32,9 +32,11 @@ level](#why-the-triple-has-no-api-level).
 
 | Build option | Produced from | Minimum API | Status |
 | --- | --- | --- | --- |
-| `upstream` | the official Python.org Android package, re-assembled | 24 | released |
-| `default` | CPython source with all six pinned dependency recipes | 34 | in development |
+| `upstream` | the official Python.org Android package, re-assembled | 24 | builds, qualified on a device, not yet published |
+| `default` | CPython source with all six pinned dependency recipes | 34 | builds and reproduces, not yet qualified |
 | `extended` | `default` plus the additional dependencies upstream ships | 34 | planned |
+
+Nothing has been published from this repository yet.
 
 `default` is the flagship and carries no marker in artifact names, the way
 upstream's blessed build does. `upstream` is not a stepping stone that gets
@@ -181,6 +183,55 @@ fastest.
 Using Android's own system CA and tz databases belongs to `extended` or beyond,
 and is still under research.
 
+## How the source build works
+
+Upstream's `Android/android.py` does the cross-compilation; this project steers
+it rather than reimplementing it. The dependency prefix is populated before
+`configure` runs, which makes the flow skip its own download of the prebuilt
+archives through the guard it already has for a prefix that exists, and
+`--with-tzpath` is passed through to `configure`.
+
+The dependencies are built from upstream's own recipes, pinned at one commit,
+with two recorded overrides: the NDK revision, so the dependencies and the
+interpreter share a toolchain, and `openssldir`.
+
+One commit rather than each component's own release tag. Those tags are not
+contemporaneous: the older ones read the API level from a lowercase `api_level`
+variable that a caller setting `ANDROID_API_LEVEL` never reaches, and they pin
+three different NDK revisions between them. Building from them produced a
+dependency set at two different API levels — visibly for `xz`, and invisibly for
+`libffi`, which is statically linked into `_ctypes` and carries no ELF note to
+give it away.
+
+So the API level is checked twice, because the visible check alone would have
+missed that. The recipe environment is evaluated and its resolved compiler must
+name the requested API level, which catches the request never arriving and is
+the only check that covers static archives. Then every executable and shared
+object must report that level in the `.note.android.ident` the NDK stamps into
+it, which catches the request arriving and being ignored.
+
+### What the source build ships
+
+The build prefix is not a distribution. It carries the dependency command-line
+tools, which are not what CPython links and some of which are the GPLv2 scripts
+this project's licensing position depends on not shipping, and it carries static
+archives that are build inputs. A whitelist of the same shape as upstream's own
+packaging step reduces it, and the result is checked: a dependency tool or a
+static archive reaching the distribution fails the build.
+
+`make install` also compiles the standard library three times over. Upstream
+deletes every `__pycache__` from its install tree and the official Android
+package carries none, so this does too — and it would have to regardless,
+because timestamp-invalidated bytecode embeds the mtime of the source it was
+compiled from and can never reproduce.
+
+Two consequences worth knowing. The source build produces CPython's own
+`bin/python3.14`, so unlike the upstream-derived build it needs no launcher from
+this project. And its `install_only_stripped` archive is meaningfully smaller
+than its `install_only`, where the upstream-derived pair differ by a few
+kilobytes — the official package arrives already stripped, so for that build the
+stripped flavor is close to a formality.
+
 ## Archive contract
 
 Assembly order is fixed and each flavor is derived from the verified one above
@@ -215,6 +266,13 @@ things that would quietly break that are handled explicitly:
   because multi-threaded output depends on how the work was divided.
 - **Host paths.** Nothing recorded inside an archive names a build directory, so
   a temporary workspace cannot leak in or make two builds differ.
+- **Build timestamps.** A compiler stamps `__DATE__` and `__TIME__` into the
+  interpreter, and OpenSSL stamps a build banner. `SOURCE_DATE_EPOCH` is set to
+  the newest mtime inside the pinned CPython source archive — derived from an
+  input rather than invented, so there is no constant to keep in step.
+- **State from earlier runs.** Every tree a build writes into starts empty. A
+  workspace kept between runs is worth having for clones and downloads, but a
+  prefix left behind makes the result depend on what was built before.
 
 CI builds twice and compares, and the second build deliberately runs under a
 different umask — repeating a build under identical conditions proves much less
