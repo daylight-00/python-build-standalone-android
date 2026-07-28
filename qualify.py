@@ -290,11 +290,8 @@ def evaluate(
     runtime_data = checks.get("runtime_data", {})
     if not runtime_data.get("pass"):
         failures.append("runtime_data")
-    elif builtin_runtime_data:
-        if not runtime_data.get("ca_certificate_count"):
-            failures.append("builtin-ca-empty")
-        if any(result != "pass" for result in (runtime_data.get("zones") or {}).values()):
-            failures.append("builtin-timezone-unresolved")
+    elif builtin_runtime_data and not runtime_data.get("ca_certificate_count"):
+        failures.append("builtin-ca-empty")
 
     return {"pass": not failures, "failures": sorted(set(failures))}
 
@@ -333,7 +330,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--builtin-runtime-data",
         action="store_true",
-        help="require CA certificates and time zones to resolve with nothing set",
+        help="require CA certificates to resolve with nothing set",
     )
     parser.add_argument("-o", "--output", type=Path, help="where to write the receipt")
     return parser.parse_args(argv)

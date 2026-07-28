@@ -148,27 +148,17 @@ Separating the track is deliberate: `certifi` and `tzdata` expire on their own
 schedule, and a 227 KiB data refresh must not require republishing a 24 MiB
 Python archive.
 
-### `default` — compiled-in defaults
+### `default` — a compiled-in trust store
 
-The source build sets Termux's absolute paths as build defaults, so the standard
-discovery mechanism works the way it does in an upstream Linux build:
+Only the CA half is solved at build time:
 
 ```
-CPython   --with-tzpath=/data/data/com.termux/files/usr/share/zoneinfo
 OpenSSL   --openssldir=/data/data/com.termux/files/usr/etc/tls
 ```
 
-Both stay overridable at runtime (`SSL_CERT_FILE`, `SSL_CERT_DIR`,
-`PYTHONTZPATH`), the external data product still works, and the runtime requires
-no Termux prefix and no Termux native library. This is a courtesy to the
-realistic user base, not a dependency — which is also why it is not named in the
-artifact.
-
-The two halves are configured in different places, and that decides the build's
-scope. `--with-tzpath` is a CPython configure argument, free for a source build.
-`--openssldir` is an *OpenSSL* configure argument, fixed when OpenSSL is built —
-and upstream's `Android/android.py` downloads prebuilt BeeWare dependency
-archives built with OpenSSL's default:
+`--openssldir` is fixed when OpenSSL is compiled, and upstream's
+`Android/android.py` downloads prebuilt dependency archives built with OpenSSL's
+default:
 
 ```
 /usr/local/ssl/cert.pem
@@ -176,9 +166,24 @@ archives built with OpenSSL's default:
 ```
 
 Neither path exists on Android, which is the root cause of the empty trust
-store. So `default` builds all six dependency recipes from source rather than
-unpacking them. That is also the configuration the measurement above found
-fastest.
+store, and no amount of repackaging can change it afterwards. So `default`
+builds all six dependency recipes from source rather than unpacking them — that
+one argument is the whole reason. It stays overridable at runtime with
+`SSL_CERT_FILE` and `SSL_CERT_DIR`, and it makes the runtime require no Termux
+prefix and no Termux native library, which is why it is not named in the
+artifact.
+
+**The time zone path is left at CPython's default**, as upstream leaves it.
+Termux ships no zoneinfo tree, so compiling in a path to one would name a
+directory that does not exist. `zoneinfo` therefore falls back to the `tzdata`
+package, exactly as it does on a Linux host with no system zoneinfo installed.
+Callers who need time zones install `tzdata`, set `PYTHONTZPATH`, or use the
+data product.
+
+An earlier version of this document claimed the source build solved both halves.
+It did not: a device found `ZoneInfo("Asia/Seoul")` failing while the
+qualification gate passed, because nothing checked it. The gate checks it now,
+and only against what a build actually declares.
 
 Using Android's own system CA and tz databases belongs to `extended` or beyond,
 and is still under research.
@@ -186,10 +191,10 @@ and is still under research.
 ## How the source build works
 
 Upstream's `Android/android.py` does the cross-compilation; this project steers
-it rather than reimplementing it. The dependency prefix is populated before
-`configure` runs, which makes the flow skip its own download of the prebuilt
-archives through the guard it already has for a prefix that exists, and
-`--with-tzpath` is passed through to `configure`.
+it rather than reimplementing it. The one thing it steers is the dependency
+prefix, which is populated before `configure` runs so the flow skips its own
+download of the prebuilt archives, through the guard it already has for a prefix
+that exists. Everything the interpreter build itself does is upstream's.
 
 The dependencies are built from upstream's own recipes, pinned at one commit,
 with two recorded overrides: the NDK revision, so the dependencies and the

@@ -127,7 +127,7 @@ def _check_runtime_data(build: Build, checks: dict[str, Any], path: Path) -> dic
     fault there.
     """
     observed = checks.get("runtime_data")
-    mechanism = build.runtime_data.get("mechanism")
+    declared = build.runtime_data
     if observed is None:
         raise QualificationError(
             f"{path} predates the runtime-data probe. Re-run qualify.py so the receipt "
@@ -138,30 +138,30 @@ def _check_runtime_data(build: Build, checks: dict[str, Any], path: Path) -> dic
 
     zones = observed.get("zones") or {}
     summary = {
-        "mechanism": mechanism,
+        "mechanism": declared.get("mechanism"),
         "ca_certificate_count": observed.get("ca_certificate_count"),
         "tzpath_configured": observed.get("tzpath_configured"),
         "tzpath_present": observed.get("tzpath_present"),
         "zones": zones,
     }
-    if mechanism != "build-default":
-        return summary
-
+    # Only what the build actually declares is required to work unaided. A path
+    # this build does not compile in is not this build's promise to keep.
     problems = []
-    if not observed.get("ca_certificate_count"):
+    if declared.get("openssldir") and not observed.get("ca_certificate_count"):
         problems.append(
             f"no CA certificates resolved from {observed.get('openssl_cafile')!r} "
             f"(present: {observed.get('openssl_cafile_present')})"
         )
-    unresolved = {key: value for key, value in zones.items() if value != "pass"}
-    if unresolved:
-        problems.append(
-            f"time zones did not resolve from {observed.get('tzpath_configured')!r} "
-            f"(directories present: {observed.get('tzpath_present')}): {sorted(unresolved)}"
-        )
+    if declared.get("tzpath"):
+        unresolved = {key: value for key, value in zones.items() if value != "pass"}
+        if unresolved:
+            problems.append(
+                f"time zones did not resolve from {observed.get('tzpath_configured')!r} "
+                f"(directories present: {observed.get('tzpath_present')}): {sorted(unresolved)}"
+            )
     if problems:
         raise QualificationError(
-            f"{build.name} compiles its CA and time zone paths in, so they must resolve "
-            f"with nothing set. On this device they did not:\n  " + "\n  ".join(problems)
+            f"{build.name} compiles these paths in, so they must resolve with nothing "
+            f"set. On this device they did not:\n  " + "\n  ".join(problems)
         )
     return summary

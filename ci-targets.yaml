@@ -35,13 +35,19 @@ android:
             AC_CHECK_FUNCS list. Above it the build makes identical decisions,
             so raising it would only cost device coverage.
 
-        # Compiled-in defaults, so the standard discovery mechanism works the
-        # way it does in an upstream Linux build. Both stay overridable at
-        # runtime and neither makes the runtime require Termux.
+        # OpenSSL's trust store is compiled in, because its default of
+        # /usr/local/ssl does not exist on Android and cannot be changed after
+        # the fact. It stays overridable at runtime and does not make the
+        # runtime require Termux.
+        #
+        # The time zone path is deliberately left at CPython's default, as
+        # upstream leaves it. Termux ships no zoneinfo tree, so pointing at one
+        # would name a directory that does not exist; zoneinfo falls back to the
+        # tzdata package exactly as it does on a Linux host without system
+        # zoneinfo installed.
         runtime_data:
           mechanism: build-default
           openssldir: /data/data/com.termux/files/usr/etc/tls
-          tzpath: /data/data/com.termux/files/usr/share/zoneinfo
 
         uv_catalog: download-metadata.json
 

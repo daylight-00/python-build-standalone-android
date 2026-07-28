@@ -91,9 +91,13 @@ to a host-private directory.
 Bionic has no `/etc/ssl/certs` and no `/usr/share/zoneinfo`, so a stock CPython
 finds an empty trust store and no time zone database.
 
-The flagship build compiles in Termux's paths, so both work out of the box under
-Termux and stay overridable with `SSL_CERT_FILE`, `SSL_CERT_DIR`, and
-`PYTHONTZPATH`.
+The flagship build compiles in Termux's trust store, so HTTPS works out of the
+box under Termux, overridable with `SSL_CERT_FILE` and `SSL_CERT_DIR`.
+
+It leaves the time zone path at CPython's default, as upstream does, because
+Termux ships no zoneinfo tree. `zoneinfo` falls back to the `tzdata` package the
+same way it does on a Linux host without system zoneinfo, so install `tzdata`,
+set `PYTHONTZPATH`, or use the data product.
 
 The `upstream` build cannot compile anything in — the official package is
 consumed as-is. Install the data product from the `android-data-*` release track
