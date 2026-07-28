@@ -30,8 +30,13 @@ These hold for every build. Breaking one is a bug even when tests pass.
   agree, across machines and umasks. Anything a build writes without an explicit
   mode, any timestamp a compiler stamps in, and any tool whose version is not
   pinned will break this.
-- **Nothing inside an archive names a host path.** Not a build directory, not a
-  temporary workspace, not a tool's location.
+- **Nothing inside an archive names a directory of the machine that built it.**
+  Not a build tree, not a workspace, not the toolchain's location, not the build
+  user's home. Upstream's own paths, where a repackaged build recorded them, stay:
+  there they are the producer's provenance and every consumer of that package sees
+  the same ones. Text is rewritten to a placeholder; a compiled object needs
+  `-ffile-prefix-map`; a string a build recorded about itself can only be fixed by
+  building it differently.
 - **Every tree a build writes into starts empty.** Workspaces may persist for
   clones and downloads; a tree left behind makes the result depend on what was
   built before. This one has bitten three times.
