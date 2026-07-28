@@ -282,12 +282,13 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
             )
             launcher_record["aliases"] = _install_launcher(install, launcher_binary, python_mm)
 
-        overlay = apply_consumer_overlay(install, python_mm=python_mm, host_triple=build.triple)
-        # Before anything reads the metadata: PYTHON.json drops tokens that name a
-        # producer path, and this build's own directories must already be
-        # placeholders by then, or which of the two passes sees them depends on
-        # where the build ran.
+        # Before anything reads or records the metadata. PYTHON.json drops tokens
+        # that name a producer path, so this build's own directories have to be
+        # placeholders by then, or which of the two passes sees a value depends on
+        # where the build ran. The overlay records what it changed and from what,
+        # and those hashes describe the files as they will ship.
         install_paths = _normalize_host_paths(install, source.host_paths)
+        overlay = apply_consumer_overlay(install, python_mm=python_mm, host_triple=build.triple)
         config_vars_source = sysconfig_vars_json(install, python_mm)
         pip = install_bundled_pip(install, python_mm)
         licenses = _install_licenses(install)

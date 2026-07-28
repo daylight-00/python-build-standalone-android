@@ -186,6 +186,23 @@ def relocate_pkgconfig(prefix: Path, rows: list[dict[str, Any]]) -> list[dict[st
     return updated
 
 
+def drop_libtool_archives(prefix: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove libtool's bookkeeping from the merged prefix.
+
+    A ``.la`` file records the absolute directory its library was installed to,
+    and there is no relocatable way to write that. Nothing here reads them — the
+    interpreter links through pkg-config — and they are curated out of every
+    distribution, so all they contribute is a record of where the build ran.
+    """
+    kept: list[dict[str, Any]] = []
+    for row in rows:
+        if row["type"] == "file" and row["path"].endswith(".la"):
+            (prefix / row["path"]).unlink()
+            continue
+        kept.append(row)
+    return kept
+
+
 def _relocate_pc(text: str) -> str:
     recorded = next(
         (line[len("prefix=") :] for line in text.splitlines() if line.startswith("prefix=")), ""
@@ -342,6 +359,7 @@ def build_dependencies(
         if not produced.is_file():
             raise RuntimeError(f"{name} recipe did not produce {produced}")
         rows = relocate_pkgconfig(prefix, safe_extract_tar(produced, prefix))
+        rows = drop_libtool_archives(prefix, rows)
 
         # The identity of what the component contributed, not of the tarball the
         # recipe wrapped it in: that wrapper is written with `tar -czf`, whose

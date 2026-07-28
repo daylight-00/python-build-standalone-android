@@ -209,7 +209,18 @@ that exists. Everything the interpreter build itself does is upstream's.
 
 The dependencies are built from upstream's own recipes, pinned at one commit,
 with two recorded overrides: the NDK revision, so the dependencies and the
-interpreter share a toolchain, and `openssldir`.
+interpreter share a toolchain, and `openssldir`. Two more overrides exist for
+reproducibility rather than for behaviour, and are covered under
+[reproducibility](#reproducibility): the file prefix map, and naming the tools
+without their directory.
+
+What each component installs is taken as it comes, with one exception. A
+component's pkg-config file records the directory that component was configured
+in — `libffi`, `xz` and `zstd` do, and `xz` writes `includedir` and `libdir` out
+in full, not only `prefix`. Merged into one prefix those files describe somewhere
+they are not, which decides which include and library directories `configure` is
+handed, so each is rewritten to describe the prefix it is in before its contents
+are recorded.
 
 One commit rather than each component's own release tag. Those tags are not
 contemporaneous: the older ones read the API level from a lowercase `api_level`
@@ -269,6 +280,8 @@ python/
 one `python/` root with deterministic ordering, normalized ownership and
 timestamps, no absolute or traversal paths, no hard links, and only relative
 non-escaping symlinks.
+
+### Reproducibility
 
 Two builds of the same input produce byte-identical archives, on any host. Each
 of the following would quietly break that, and is handled explicitly:
