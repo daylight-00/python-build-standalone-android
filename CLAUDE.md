@@ -1,0 +1,87 @@
+# Working in this repository
+
+Standalone CPython distributions for Android, published in the shape of
+[astral-sh/python-build-standalone][pbs]. This repository holds build recipes
+and release machinery. Design questions get settled in
+[cpython-android-cli][research] and arrive here as recipes — if a question needs
+an experiment to answer, it does not belong in this repository.
+
+## Where the facts are
+
+Nothing here restates what a file already says, so that this document does not
+go stale. Read the file.
+
+| Question | File |
+| --- | --- |
+| What builds exist, their API levels, what each compiles in | `ci-targets.yaml` |
+| Exact inputs and their checksums | `config/**/*.lock.json` |
+| Why anything is the way it is | `docs/design.md` |
+| What is supported, and what deliberately is not | `docs/support.md` |
+| What each component's license is and where its text came from | `licenses/components.json` |
+
+When code and one of these disagree, the file is not automatically right —
+but one of them is wrong, and both should not be left standing.
+
+## Invariants
+
+These hold for every build. Breaking one is a bug even when tests pass.
+
+- **Archives are byte-reproducible on any host.** Two builds of the same input
+  agree, across machines and umasks. Anything a build writes without an explicit
+  mode, any timestamp a compiler stamps in, and any tool whose version is not
+  pinned will break this.
+- **Nothing inside an archive names a host path.** Not a build directory, not a
+  temporary workspace, not a tool's location.
+- **Every tree a build writes into starts empty.** Workspaces may persist for
+  clones and downloads; a tree left behind makes the result depend on what was
+  built before. This one has bitten three times.
+- **A qualification receipt is evidence only for the bytes it names.** It binds
+  artifacts by SHA-256. Never widen a receipt to cover a build it did not run.
+- **Metadata is omitted rather than invented.** If a field would describe
+  something this project did not produce, leave it out.
+- **A build is held only to what it declares.** `ci-targets.yaml` says what a
+  build compiles in; the gate requires exactly that and no more.
+
+## How to work here
+
+Real defects here have come from running the invariants, not from reading the
+code. When something looks wrong, reach for a diff before a hypothesis: build
+twice and compare, extract both archives and compare member by member, read the
+ELF note rather than trusting the build that claims to have set it.
+
+- **Follow upstream unless there is a reason not to, and record the reason.**
+  When this project diverges from astral's contract or patches an upstream
+  recipe, the divergence and its justification are written down next to it.
+- **Derive constants from pinned inputs.** A value computed from a lock file
+  cannot drift out of step with one; a value typed into the source can.
+- **Guards over conventions.** If something must not reach a distribution, make
+  the build fail on it. Several of these exist and each has caught something.
+- **Claims are sized to evidence.** "Runs on a given API level" and "was run on
+  a device at that level" are different statements, and a build floor is the
+  first, not the second. The documentation says which one it means.
+
+## Commands
+
+```console
+$ ./build.py --target <triple[:option]> --tag <YYYYMMDD>   # build one distribution
+$ ./check-qualification.py --target <…> --tag <…>          # does a receipt cover it
+$ ./generate-catalog.py --target <…> --tag <…>             # uv download metadata
+$ python3 qualify.py <archive> --expected-api <n>          # on a device, stdlib only
+$ uv run ruff check . && uv run ruff format . && uv run mypy pythonbuild
+```
+
+`just` recipes wrap these; `just --list` shows them. Releases are manual,
+gated, and default to a dry run — see `.github/workflows/release.yml`.
+
+Building from source needs an Android NDK at the pinned revision; the build
+prints how to install it if it cannot find one.
+
+## Commits
+
+Angular convention: `type(scope): summary` in the imperative. Write body
+paragraphs as single lines with blank lines between them — GitHub renders a
+hard-wrapped body as broken lines. Say what changed and why it was worth
+changing; if a fix came from a diagnosis, the diagnosis is the interesting part.
+
+[pbs]: https://github.com/astral-sh/python-build-standalone
+[research]: https://github.com/daylight-00/cpython-android-cli
