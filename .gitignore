@@ -1,4 +1,5 @@
 /build/
+/build-*/
 /work/
 /build-reproducibility-check/
 /dist/
