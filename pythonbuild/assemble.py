@@ -283,6 +283,11 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
             launcher_record["aliases"] = _install_launcher(install, launcher_binary, python_mm)
 
         overlay = apply_consumer_overlay(install, python_mm=python_mm, host_triple=build.triple)
+        # Before anything reads the metadata: PYTHON.json drops tokens that name a
+        # producer path, and this build's own directories must already be
+        # placeholders by then, or which of the two passes sees them depends on
+        # where the build ran.
+        install_paths = _normalize_host_paths(install, source.host_paths)
         config_vars_source = sysconfig_vars_json(install, python_mm)
         pip = install_bundled_pip(install, python_mm)
         licenses = _install_licenses(install)
@@ -323,7 +328,13 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
 
         write_json(
             records / "host-paths.json",
-            {"schema_version": 1, **_normalize_host_paths(python_root, source.host_paths)},
+            {
+                "schema_version": 1,
+                "passes": {
+                    "install": install_paths,
+                    "archive": _normalize_host_paths(python_root, source.host_paths),
+                },
+            },
         )
 
         manifest_path = records / "member-manifest.json"

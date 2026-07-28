@@ -270,8 +270,8 @@ one `python/` root with deterministic ordering, normalized ownership and
 timestamps, no absolute or traversal paths, no hard links, and only relative
 non-escaping symlinks.
 
-Two builds of the same input produce byte-identical archives, on any host. Three
-things that would quietly break that are handled explicitly:
+Two builds of the same input produce byte-identical archives, on any host. Each
+of the following would quietly break that, and is handled explicitly:
 
 - **The caller's umask.** Every `mkdir` and every JSON record written without an
   explicit mode takes it, and those modes land in the archive. The build sets a
@@ -280,8 +280,21 @@ things that would quietly break that are handled explicitly:
   bytes, and the `zstd` on a machine is whatever that machine has. Compression
   goes through the `zstandard` library, pinned by `uv.lock`, single-threaded
   because multi-threaded output depends on how the work was divided.
-- **Host paths.** Nothing recorded inside an archive names a build directory, so
-  a temporary workspace cannot leak in or make two builds differ.
+- **Host paths.** Nothing inside an archive names a directory of the machine that
+  built it: not the build tree, not the toolchain, not the build user's home.
+  Generated text is rewritten to a placeholder, compiled objects are given
+  `-ffile-prefix-map` for both the build tree and the NDK, since an object's line
+  table names the sysroot headers it read, and the tools are named without their
+  directory so that the command lines a build records about itself — OpenSSL's
+  compiler banner, configure's `CONFIG_ARGS` — carry no path at all. That last one
+  cannot be fixed afterwards: a string inside a shared object is not rewritable.
+- **The `pkg-config` on the machine.** Two implementations are in circulation and
+  they disagree on which `.pc` file a dependency resolves to and on how the flags
+  it yields are spelled. configure records what it was handed, so the
+  disagreement reaches the Makefile, `sysconfigdata`, and the compile line of any
+  module found this way. `pkgconf` is pinned by `uv.lock` and put on `PATH` under
+  the name the builds call, and `PKG_CONFIG_PATH` is dropped from the
+  environment.
 - **Build timestamps.** A compiler stamps `__DATE__` and `__TIME__` into the
   interpreter, and OpenSSL stamps a build banner. `SOURCE_DATE_EPOCH` is set to
   the newest mtime inside the pinned CPython source archive — derived from an
