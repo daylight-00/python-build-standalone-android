@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "jsonschema>=4.23.0",
+    "pkgconf>=3.0.1.post0",
     "pyyaml>=6.0.2",
     "zstandard>=0.23.0",
 ]

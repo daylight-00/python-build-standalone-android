@@ -31,6 +31,7 @@ from .archive import safe_extract_tar
 from .downloads import acquire
 from .elf import android_note, elf_objects
 from .targets import ROOT
+from .toolchain import pkg_config_identity
 from .utils import file_identity, read_json_object, run_checked, sha256_path
 
 RECIPE_LOCK = ROOT / "config/source/dependency-recipes.lock.json"
@@ -209,6 +210,7 @@ def build_dependencies(
     readelf: str,
     source_date_epoch: int,
     host_paths: tuple[tuple[str, str], ...],
+    pkg_config_bin: Path,
     lock_path: Path = RECIPE_LOCK,
 ) -> tuple[Path, dict[str, Any]]:
     """Build every dependency from source and merge them into one prefix."""
@@ -226,6 +228,9 @@ def build_dependencies(
     environment = dict(os.environ)
     environment["ANDROID_API_LEVEL"] = str(android_api)
     environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
+    environment["PATH"] = os.pathsep.join([str(pkg_config_bin), environment.get("PATH", "")])
+    # A search path inherited from the host would decide which .pc file is read.
+    environment.pop("PKG_CONFIG_PATH", None)
 
     # One recipe revision, so every component is built the same way. The
     # overrides are not identical for every component: OpenSSL needs one the
@@ -312,6 +317,7 @@ def build_dependencies(
         "repository": lock["recipes"]["repository"],
         "recipe_commit": commit,
         "compiler": compiler,
+        "pkg_config": pkg_config_identity(),
         "overrides": applied,
         "android_api": android_api,
         "ndk_revision": ndk_revision,

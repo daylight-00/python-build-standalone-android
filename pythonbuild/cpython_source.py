@@ -24,7 +24,7 @@ from .dependencies import bare_toolchain_override, build_dependencies, file_pref
 from .downloads import acquire
 from .elf import android_note, elf_objects
 from .targets import Build
-from .toolchain import Toolchain
+from .toolchain import Toolchain, pkg_config_identity, pkg_config_shim
 from .utils import file_identity, read_json_object, run_checked
 
 ANDROID_DRIVER = "Android/android.py"
@@ -57,6 +57,7 @@ def build_cpython(
     host: str,
     tzpath: str | None,
     toolchain_bin: Path,
+    pkg_config_bin: Path,
     readelf: str,
     source_date_epoch: int,
     host_paths: tuple[tuple[str, str], ...],
@@ -97,7 +98,11 @@ def build_cpython(
     # `make` deliberately does not source it — upstream relies on configure having
     # captured the absolute paths in the Makefile, and those are exactly what this
     # build does not want recorded.
-    environment["PATH"] = os.pathsep.join([str(toolchain_bin), environment.get("PATH", "")])
+    environment["PATH"] = os.pathsep.join(
+        [str(pkg_config_bin), str(toolchain_bin), environment.get("PATH", "")]
+    )
+    # A search path inherited from the host would decide which .pc file is read.
+    environment.pop("PKG_CONFIG_PATH", None)
 
     configure_args = [f"--with-tzpath={tzpath}"] if tzpath else []
 
@@ -122,6 +127,7 @@ def build_cpython(
         "android_api": android_api,
         "host": host,
         "configure_args": configure_args,
+        "pkg_config": pkg_config_identity(),
         "source_date_epoch": source_date_epoch,
         "overrides": applied_overrides,
         "driver": ANDROID_DRIVER,
@@ -237,6 +243,9 @@ def prepare_source_prefix(
         (str(toolchain.ndk), TOOLCHAIN_PLACEHOLDER),
     )
 
+    # One pkg-config for the whole build, and the one this project pins.
+    pkg_config_bin = pkg_config_shim(workspace / "pkg-config")
+
     dependency_prefix, dependencies = build_dependencies(
         workspace=workspace / "dependencies",
         cache=cache,
@@ -246,6 +255,7 @@ def prepare_source_prefix(
         readelf=str(toolchain.readelf),
         source_date_epoch=source_date_epoch,
         host_paths=host_paths,
+        pkg_config_bin=pkg_config_bin,
     )
     built_prefix, cpython = build_cpython(
         workspace=workspace / "cpython",
@@ -255,6 +265,7 @@ def prepare_source_prefix(
         host=build.triple,
         tzpath=runtime_data.get("tzpath"),
         toolchain_bin=toolchain.readelf.parent,
+        pkg_config_bin=pkg_config_bin,
         readelf=str(toolchain.readelf),
         source_date_epoch=source_date_epoch,
         host_paths=host_paths,

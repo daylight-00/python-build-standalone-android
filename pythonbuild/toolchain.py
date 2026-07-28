@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import pkgconf
 import zstandard
 
 from .downloads import DEFAULT_CACHE, acquire, extract_tarball, host_entry, host_tag
@@ -19,6 +20,29 @@ from .targets import ROOT, Build
 from .utils import read_json_object, run
 
 TOOLCHAIN_LOCK = ROOT / "config/toolchain.lock.json"
+
+
+def pkg_config_identity() -> str:
+    """What ``pkg-config`` resolved to, recorded by the builds that run it."""
+    version = run([str(pkgconf.get_executable()), "--version"]).stdout.strip()
+    return f"pkgconf {version}"
+
+
+def pkg_config_shim(directory: Path) -> Path:
+    """A ``pkg-config`` that is the same program on every host.
+
+    configure and the recipes look it up on PATH, and which implementation they
+    find decides both which .pc file is read for a dependency and how the flags
+    it yields are spelled. The two in circulation disagree on both, which made
+    two hosts produce different interpreters from the same input. Pinned through
+    ``uv.lock``, like every other tool this build runs, and exposed under the name
+    the builds actually call.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    shim = directory / "pkg-config"
+    shim.unlink(missing_ok=True)
+    shim.symlink_to(pkgconf.get_executable())
+    return directory
 
 
 @dataclass(frozen=True)
