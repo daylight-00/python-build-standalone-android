@@ -81,6 +81,41 @@ for path in sorted(libdir.rglob("*.so")):
 print(json.dumps(results))
 """
 
+# What the distribution resolves for CA certificates and time zones, without any
+# environment set. A build that compiles these paths in should work as it stands;
+# one that expects an external data product should not, and saying which is the
+# gate's job rather than this probe's.
+RUNTIME_DATA_PROBE = """
+import json, os, ssl, sysconfig, zoneinfo
+paths = ssl.get_default_verify_paths()
+try:
+    certs = len(ssl.create_default_context().get_ca_certs())
+    ca_error = None
+except Exception as error:
+    certs, ca_error = 0, f"{type(error).__name__}: {error}"
+zones = {}
+for key in ("Asia/Seoul", "America/New_York"):
+    try:
+        zoneinfo.ZoneInfo(key)
+        zones[key] = "pass"
+    except Exception as error:
+        zones[key] = f"{type(error).__name__}: {error}"
+print(json.dumps({
+    "tzpath_configured": sysconfig.get_config_var("TZPATH"),
+    "tzpath_runtime": list(zoneinfo.TZPATH),
+    "tzpath_present": [p for p in zoneinfo.TZPATH if os.path.isdir(p)],
+    "zones": zones,
+    "openssl_cafile": paths.openssl_cafile,
+    "openssl_cafile_present": bool(paths.openssl_cafile)
+        and os.path.exists(paths.openssl_cafile),
+    "openssl_capath": paths.openssl_capath,
+    "openssl_capath_present": bool(paths.openssl_capath)
+        and os.path.isdir(paths.openssl_capath),
+    "ca_certificate_count": certs,
+    "ca_error": ca_error,
+}))
+"""
+
 SUBPROCESS_PROBE = """
 import json, subprocess, sys
 result = subprocess.run(
@@ -186,6 +221,7 @@ def qualify(archive: Path, workspace: Path) -> dict[str, Any]:
     checks["extensions"] = run_probe(interpreter, EXTENSIONS_PROBE, env)
     checks["dlopen"] = run_probe(interpreter, DLOPEN_PROBE, env)
     checks["subprocess"] = run_probe(interpreter, SUBPROCESS_PROBE, env)
+    checks["runtime_data"] = run_probe(interpreter, RUNTIME_DATA_PROBE, env)
 
     # No LD_LIBRARY_PATH is set anywhere above: the relative RUNPATH has to be
     # doing the work on its own.
@@ -212,7 +248,9 @@ def qualify(archive: Path, workspace: Path) -> dict[str, Any]:
     return checks
 
 
-def evaluate(checks: dict[str, Any], expected_api: int | None) -> dict[str, Any]:
+def evaluate(
+    checks: dict[str, Any], expected_api: int | None, *, builtin_runtime_data: bool = False
+) -> dict[str, Any]:
     identity = checks.get("identity", {})
     failures: list[str] = []
 
@@ -245,6 +283,18 @@ def evaluate(checks: dict[str, Any], expected_api: int | None) -> dict[str, Any]
         str(expected_api),
     ):
         failures.append("api-level-mismatch")
+
+    # Only a build that compiles these paths in is expected to resolve them with
+    # nothing set. For one that ships an external data product, finding no trust
+    # store here is the documented behaviour rather than a fault.
+    runtime_data = checks.get("runtime_data", {})
+    if not runtime_data.get("pass"):
+        failures.append("runtime_data")
+    elif builtin_runtime_data:
+        if not runtime_data.get("ca_certificate_count"):
+            failures.append("builtin-ca-empty")
+        if any(result != "pass" for result in (runtime_data.get("zones") or {}).values()):
+            failures.append("builtin-timezone-unresolved")
 
     return {"pass": not failures, "failures": sorted(set(failures))}
 
@@ -280,6 +330,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="sibling artifacts of the same build to record identities for",
     )
     parser.add_argument("--expected-api", type=int)
+    parser.add_argument(
+        "--builtin-runtime-data",
+        action="store_true",
+        help="require CA certificates and time zones to resolve with nothing set",
+    )
     parser.add_argument("-o", "--output", type=Path, help="where to write the receipt")
     return parser.parse_args(argv)
 
@@ -293,7 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="qualify-") as tmp:
         checks = qualify(args.archive, Path(tmp))
 
-    verdict = evaluate(checks, args.expected_api)
+    verdict = evaluate(checks, args.expected_api, builtin_runtime_data=args.builtin_runtime_data)
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "receipt_kind": "android-device-qualification",
@@ -312,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
             if path.is_file()
         ],
         "device": device(),
+        "expectations": {"builtin_runtime_data": args.builtin_runtime_data},
         "checks": checks,
         "verdict": verdict,
     }

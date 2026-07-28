@@ -90,13 +90,16 @@ def verify(
             f"{path} records an ABI this project does not release for: {abi!r}"
         )
 
-    identity = (receipt.get("checks") or {}).get("identity") or {}
+    checks = receipt.get("checks") or {}
+    identity = checks.get("identity") or {}
     reported_api = identity.get("android_api_level")
     if str(reported_api) != str(build.android_api.level):
         raise QualificationError(
             f"{path} reports ANDROID_API_LEVEL {reported_api!r}, "
             f"but {build.name} declares {build.android_api.level}"
         )
+
+    runtime_data = _check_runtime_data(build, checks, path)
 
     return {
         "receipt": path.relative_to(ROOT).as_posix(),
@@ -110,4 +113,55 @@ def verify(
             key: identity.get(key)
             for key in ("version", "soabi", "multiarch", "platform", "android_api_level")
         },
+        "runtime_data": runtime_data,
     }
+
+
+def _check_runtime_data(build: Build, checks: dict[str, Any], path: Path) -> dict[str, Any]:
+    """Hold a build to what it claims about CA certificates and time zones.
+
+    The device records what it found; which findings are acceptable depends on
+    the build. One that compiles the paths in has to resolve them with nothing
+    set, because that is the whole reason it is built from source. One that ships
+    an external data product is expected not to, so the same finding is not a
+    fault there.
+    """
+    observed = checks.get("runtime_data")
+    mechanism = build.runtime_data.get("mechanism")
+    if observed is None:
+        raise QualificationError(
+            f"{path} predates the runtime-data probe. Re-run qualify.py so the receipt "
+            f"records what the distribution resolves for CA certificates and time zones."
+        )
+    if not observed.get("pass"):
+        raise QualificationError(f"{path} could not probe runtime data: {observed.get('error')}")
+
+    zones = observed.get("zones") or {}
+    summary = {
+        "mechanism": mechanism,
+        "ca_certificate_count": observed.get("ca_certificate_count"),
+        "tzpath_configured": observed.get("tzpath_configured"),
+        "tzpath_present": observed.get("tzpath_present"),
+        "zones": zones,
+    }
+    if mechanism != "build-default":
+        return summary
+
+    problems = []
+    if not observed.get("ca_certificate_count"):
+        problems.append(
+            f"no CA certificates resolved from {observed.get('openssl_cafile')!r} "
+            f"(present: {observed.get('openssl_cafile_present')})"
+        )
+    unresolved = {key: value for key, value in zones.items() if value != "pass"}
+    if unresolved:
+        problems.append(
+            f"time zones did not resolve from {observed.get('tzpath_configured')!r} "
+            f"(directories present: {observed.get('tzpath_present')}): {sorted(unresolved)}"
+        )
+    if problems:
+        raise QualificationError(
+            f"{build.name} compiles its CA and time zone paths in, so they must resolve "
+            f"with nothing set. On this device they did not:\n  " + "\n  ".join(problems)
+        )
+    return summary
