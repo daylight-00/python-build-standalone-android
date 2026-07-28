@@ -2,13 +2,13 @@
   "bound_artifacts": [
     {
       "filename": "cpython-3.14.6+20260728-aarch64-linux-android-full.tar.zst",
-      "sha256": "59e4329a1270a5af0c285506709f882b870ffb3314e0a3373483859cf1a98686",
-      "size_bytes": 25485008
+      "sha256": "45c31cb6d7c2500f6b256d7c5cdea2c1dbf48258840e76ee98e8da7733812b47",
+      "size_bytes": 25485033
     },
     {
       "filename": "cpython-3.14.6+20260728-aarch64-linux-android-install_only.tar.gz",
-      "sha256": "dafcbcda6a67f0ad72491ca56ab4a7ede8ec0fca85d04914b74d0c0dd82bfc99",
-      "size_bytes": 33684181
+      "sha256": "698f2e9df2ebf06274f90e13e6e66f2ca848b71b574aeb778046d483e27154de",
+      "size_bytes": 33684191
     }
   ],
   "checks": {
@@ -35,14 +35,14 @@
     },
     "identity": {
       "android_api_level": 34,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python/bin/python3.14",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/runtime/python/bin/python3.14",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": true,
       "platform": "android-34-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/runtime/python",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
     },
@@ -52,26 +52,47 @@
     "pip": {
       "pass": true,
       "stderr": "",
-      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
+      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-hr87nf61/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
     },
     "relocated_identity": {
       "android_api_level": 34,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/relocated/a/deeper/path/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/relocated/a/deeper/path/python/bin/python3.14",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/relocated/a/deeper/path/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/relocated/a/deeper/path/python/bin/python3.14",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": true,
       "platform": "android-34-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/relocated/a/deeper/path/python",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/relocated/a/deeper/path/python",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
+    },
+    "runtime_data": {
+      "ca_certificate_count": 119,
+      "ca_error": null,
+      "openssl_cafile": "/data/data/com.termux/files/usr/etc/tls/cert.pem",
+      "openssl_cafile_present": true,
+      "openssl_capath": "/data/data/com.termux/files/usr/etc/tls/certs",
+      "openssl_capath_present": false,
+      "pass": true,
+      "tzpath_configured": "/usr/share/zoneinfo:/usr/lib/zoneinfo:/usr/share/lib/zoneinfo:/etc/zoneinfo",
+      "tzpath_present": [],
+      "tzpath_runtime": [
+        "/usr/share/zoneinfo",
+        "/usr/lib/zoneinfo",
+        "/usr/share/lib/zoneinfo",
+        "/etc/zoneinfo"
+      ],
+      "zones": {
+        "America/New_York": "ZoneInfoNotFoundError: 'No time zone found with key America/New_York'",
+        "Asia/Seoul": "ZoneInfoNotFoundError: 'No time zone found with key Asia/Seoul'"
+      }
     },
     "subprocess": {
       "pass": true,
       "returncode": 0,
       "stderr": "",
-      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python"
+      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/runtime/python"
     },
     "venv": {
       "pass": true,
@@ -80,14 +101,14 @@
     },
     "venv_identity": {
       "android_api_level": 34,
-      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/runtime/python",
-      "executable": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/state/venv/bin/python",
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/state/venv/bin/python",
       "ext_suffix": ".cpython-314-aarch64-linux-android.so",
       "multiarch": "aarch64-linux-android",
       "pass": true,
       "paths_within_prefix": false,
       "platform": "android-34-arm64_v8a",
-      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-quo10jfo/state/venv",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-hr87nf61/state/venv",
       "soabi": "cpython-314-aarch64-linux-android",
       "version": "3.14.6"
     }
@@ -103,8 +124,11 @@
   },
   "executed_artifact": {
     "filename": "cpython-3.14.6+20260728-aarch64-linux-android-install_only_stripped.tar.gz",
-    "sha256": "f9cf42d3144f782b9265aa49ce4e431f5ccda6a8af47ad1c7c0d74924099df94",
-    "size_bytes": 21331652
+    "sha256": "5ed6db783c67a341601ca845c819a369630087d67a9ca96fe80c949f1174b763",
+    "size_bytes": 21331643
+  },
+  "expectations": {
+    "builtin_runtime_data": false
   },
   "receipt_kind": "android-device-qualification",
   "schema_version": 1,

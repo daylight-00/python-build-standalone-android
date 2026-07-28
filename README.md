@@ -32,7 +32,7 @@ One triple, `aarch64-linux-android`, with a build option per distribution:
 | Build option | Produced from | Minimum Android | Status |
 | --- | --- | --- | --- |
 | `upstream` | the official Python.org Android package | 7.0 (API 24) | qualified, not yet published |
-| *(none)* | CPython source | 14 (API 34) | builds and reproduces, not yet qualified |
+| *(none)* | CPython source | 14 (API 34) | qualified, not yet published |
 | `extended` | CPython source, plus readline, Tk, uuid, Berkeley DB | 14 (API 34) | planned |
 
 **Nothing has been published from this repository yet**, so the install command

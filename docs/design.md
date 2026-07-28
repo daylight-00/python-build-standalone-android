@@ -32,8 +32,8 @@ level](#why-the-triple-has-no-api-level).
 
 | Build option | Produced from | Minimum API | Status |
 | --- | --- | --- | --- |
-| `upstream` | the official Python.org Android package, re-assembled | 24 | builds, qualified on a device, not yet published |
-| `default` | CPython source with all six pinned dependency recipes | 34 | builds and reproduces, not yet qualified |
+| `upstream` | the official Python.org Android package, re-assembled | 24 | qualified on a device, not yet published |
+| `default` | CPython source with all six pinned dependency recipes | 34 | qualified on a device, not yet published |
 | `extended` | `default` plus the additional dependencies upstream ships | 34 | planned |
 
 Nothing has been published from this repository yet.
@@ -184,6 +184,17 @@ An earlier version of this document claimed the source build solved both halves.
 It did not: a device found `ZoneInfo("Asia/Seoul")` failing while the
 qualification gate passed, because nothing checked it. The gate checks it now,
 and only against what a build actually declares.
+
+What the two builds resolve on a device, with nothing set:
+
+| | `default` | `upstream` |
+| --- | --- | --- |
+| OpenSSL cafile | `…/com.termux/files/usr/etc/tls/cert.pem`, present | `/usr/local/ssl/cert.pem`, absent |
+| CA certificates loaded | **119** | **0** |
+| Time zone directories present | none | none |
+
+Both figures come from the committed qualification receipts. The trust store is
+the whole difference the source build buys, and 119 against 0 is the size of it.
 
 Using Android's own system CA and tz databases belongs to `extended` or beyond,
 and is still under research.
