@@ -28,7 +28,7 @@ release-notes tag:
 check:
   uv run ruff check .
   uv run ruff format --check .
-  uv run mypy pythonbuild build.py generate-catalog.py
+  uv run mypy pythonbuild build.py generate-catalog.py check-qualification.py release-notes.py qualify.py
 
 # Apply every automatic fix.
 fmt:

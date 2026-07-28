@@ -54,6 +54,12 @@ $ ./check-qualification.py --target aarch64-linux-android:upstream --tag 2026072
 | relocation | the prefix stops working when moved |
 | `pip` | the bundled pip surface is broken |
 | `venv` | virtual environments cannot be created from the prefix |
+| runtime data | a trust store or time zone path the build compiled in does not resolve |
+
+The runtime data check asks for exactly what `ci-targets.yaml` says the build
+compiled in, and nothing more: a build that declares an `openssldir` has to
+resolve certificates there, and one that declares no time zone path is not asked
+for zones. Without it the gate passed a build whose `zoneinfo` did not work.
 
 No `LD_LIBRARY_PATH` is set for any of it, so the relative `RUNPATH` has to do
 the work on its own. The interpreter is given a caller-owned writable state root

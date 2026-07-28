@@ -31,7 +31,7 @@ jobs:
 
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy pythonbuild build.py generate-catalog.py
+      - run: uv run mypy pythonbuild build.py generate-catalog.py check-qualification.py release-notes.py qualify.py
 
       # The assembler enforces this too, but failing here takes seconds rather
       # than a full build.
