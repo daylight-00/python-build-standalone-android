@@ -156,6 +156,51 @@ unset _tool""",
     )
 
 
+def relocate_pkgconfig(prefix: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Make each ``.pc`` file describe the prefix it is in.
+
+    A component writes the directory it was configured in, and not only into
+    ``prefix``: xz writes ``includedir`` and ``libdir`` out in full as well. Those
+    are paths on this machine, they decide which include and library directories
+    pkg-config hands to configure, and they made the merged prefix depend on where
+    the build ran. Every use of the recorded prefix is expressed relative to it,
+    and the prefix itself relative to the file — the form the shipped ``.pc`` files
+    already use.
+
+    Done before the component's contents are recorded, so the record describes
+    what is in the prefix.
+    """
+    updated: list[dict[str, Any]] = []
+    for row in rows:
+        path = prefix / row["path"]
+        if row["type"] != "file" or not row["path"].endswith(".pc") or path.is_symlink():
+            updated.append(row)
+            continue
+        text = path.read_text(encoding="utf-8")
+        rewritten = _relocate_pc(text)
+        if rewritten == text:
+            updated.append(row)
+            continue
+        path.write_text(rewritten, encoding="utf-8")
+        updated.append({**row, "size": path.stat().st_size, "sha256": sha256_path(path)})
+    return updated
+
+
+def _relocate_pc(text: str) -> str:
+    recorded = next(
+        (line[len("prefix=") :] for line in text.splitlines() if line.startswith("prefix=")), ""
+    )
+    if recorded.startswith("/"):
+        text = text.replace(recorded, "${prefix}")
+    return (
+        "\n".join(
+            "prefix=${pcfiledir}/../.." if line.startswith("prefix=") else line
+            for line in text.splitlines()
+        )
+        + "\n"
+    )
+
+
 def _acquire_recipes(repository: str, commit: str, destination: Path) -> str:
     if not (destination / ".git").is_dir():
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -296,7 +341,7 @@ def build_dependencies(
         produced = download_dir / host / f"{name}-{version}-{component['build']}-{host}.tar.gz"
         if not produced.is_file():
             raise RuntimeError(f"{name} recipe did not produce {produced}")
-        rows = safe_extract_tar(produced, prefix)
+        rows = relocate_pkgconfig(prefix, safe_extract_tar(produced, prefix))
 
         # The identity of what the component contributed, not of the tarball the
         # recipe wrapped it in: that wrapper is written with `tar -czf`, whose
