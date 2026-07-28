@@ -31,12 +31,14 @@ One triple, `aarch64-linux-android`, with a build option per distribution:
 
 | Build option | Produced from | Minimum Android | Status |
 | --- | --- | --- | --- |
-| `upstream` | the official Python.org Android package | 7.0 (API 24) | qualified, not yet published |
+| `upstream` | the official Python.org Android package | 7.0 (API 24) | qualified; one superseded release |
 | *(none)* | CPython source | 14 (API 34) | qualified, not yet published |
 | `extended` | CPython source, plus readline, Tk, uuid, Berkeley DB | 14 (API 34) | planned |
 
-**Nothing has been published from this repository yet**, so the install command
-above will not resolve until the first release.
+One release exists, `20260728`, and it carries the `upstream` build alone. It was
+cut before the archives were byte-reproducible across machines, so its assets
+match nothing this repository builds today; treat it as superseded. The install
+command above will not resolve until a release carries the catalog it names.
 
 The unmarked build is the flagship. Neither API level is chosen here — each
 follows a stated rule, described in the design document.

@@ -32,11 +32,15 @@ level](#why-the-triple-has-no-api-level).
 
 | Build option | Produced from | Minimum API | Status |
 | --- | --- | --- | --- |
-| `upstream` | the official Python.org Android package, re-assembled | 24 | qualified on a device, not yet published |
+| `upstream` | the official Python.org Android package, re-assembled | 24 | qualified on a device; one superseded release |
 | `default` | CPython source with all six pinned dependency recipes | 34 | qualified on a device, not yet published |
 | `extended` | `default` plus the additional dependencies upstream ships | 34 | planned |
 
-Nothing has been published from this repository yet.
+One release exists, `20260728`, carrying the `upstream` build alone. It was cut
+before the archives were byte-reproducible across machines and its assets match
+nothing built here today. It is left in place rather than replaced: a published
+name must keep serving the bytes it was published with, and the uv catalog pins
+those bytes by hash.
 
 `default` is the flagship and carries no marker in artifact names, the way
 upstream's blessed build does. `upstream` is not a stepping stone that gets
