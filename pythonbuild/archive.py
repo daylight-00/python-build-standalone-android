@@ -115,6 +115,18 @@ def safe_extract_tar(
     return rows
 
 
+def newest_member_mtime(archive: Path) -> int:
+    """The newest timestamp inside an archive.
+
+    Used as SOURCE_DATE_EPOCH so that anything a compiler stamps with the
+    current time — ``__DATE__`` and ``__TIME__``, OpenSSL's build banner —
+    becomes a function of the pinned input instead of when the build ran. It is
+    derived rather than invented so it needs no constant to keep in step.
+    """
+    with tarfile.open(archive) as tf:
+        return int(max((member.mtime for member in tf.getmembers()), default=0))
+
+
 def copy_entry(source: Path, target: Path) -> None:
     metadata = source.lstat()
     permission = stat.S_IMODE(metadata.st_mode)

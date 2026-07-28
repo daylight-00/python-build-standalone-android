@@ -18,9 +18,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .archive import safe_extract_tar
+from .archive import newest_member_mtime, safe_extract_tar
+from .assemble import PrefixSource
+from .dependencies import build_dependencies
 from .downloads import acquire
 from .elf import android_note, elf_objects
+from .targets import Build
+from .toolchain import Toolchain
 from .utils import file_identity, read_json_object, run_checked
 
 ANDROID_DRIVER = "Android/android.py"
@@ -53,6 +57,7 @@ def build_cpython(
     host: str,
     tzpath: str | None,
     readelf: str,
+    source_date_epoch: int,
     lock_path: Path,
 ) -> tuple[Path, dict[str, Any]]:
     """Cross-compile CPython against an already-built dependency prefix."""
@@ -77,6 +82,7 @@ def build_cpython(
 
     environment = dict(os.environ)
     environment["ANDROID_API_LEVEL"] = str(android_api)
+    environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
 
     configure_args = [f"--with-tzpath={tzpath}"] if tzpath else []
 
@@ -101,6 +107,7 @@ def build_cpython(
         "android_api": android_api,
         "host": host,
         "configure_args": configure_args,
+        "source_date_epoch": source_date_epoch,
         "driver": ANDROID_DRIVER,
         "objects": verify_prefix(prefix, android_api=android_api, readelf=readelf),
     }
@@ -152,6 +159,18 @@ def curate_prefix(source: Path, destination: Path) -> dict[str, Any]:
                     shutil.copy2(path, target)
                 kept.append(f"{rel_dir}/{path.name}")
 
+    # `make install` compiles the whole standard library three times over, and
+    # upstream removes the result for the same reason: a distribution ships
+    # source, not bytecode. It also has to go for this project's reproducibility
+    # contract, because timestamp-invalidated bytecode embeds the mtime of the
+    # source it was compiled from.
+    caches = sorted(path for path in destination.rglob("__pycache__") if path.is_dir())
+    for cache in caches:
+        shutil.rmtree(cache)
+    remaining = list(destination.rglob("*.pyc"))
+    if remaining:
+        raise RuntimeError(f"bytecode survived curation: {remaining[:3]}")
+
     dropped_binaries = sorted(
         path.name
         for path in (source / "bin").iterdir()
@@ -171,12 +190,70 @@ def curate_prefix(source: Path, destination: Path) -> dict[str, Any]:
         "schema_version": 1,
         "kept": kept,
         "dropped_from_bin": dropped_binaries,
+        "bytecode_caches_removed": len(caches),
         "rationale": (
             "the dependency command-line tools are not what CPython links, and some of "
             "them are the GPLv2 scripts this project's licensing position depends on not "
             "shipping"
         ),
     }
+
+
+def prepare_source_prefix(
+    *,
+    build: Build,
+    toolchain: Toolchain,
+    workspace: Path,
+    cache: Path,
+) -> PrefixSource:
+    """Build the dependencies and CPython, and curate the result."""
+    runtime_data = build.runtime_data
+    # One timestamp for the whole build, taken from the primary pinned input.
+    source_archive = acquire(
+        read_json_object(build.input_lock_path())["source_archive"], cache, what="CPython source"
+    )
+    source_date_epoch = newest_member_mtime(source_archive)
+
+    dependency_prefix, dependencies = build_dependencies(
+        workspace=workspace / "dependencies",
+        cache=cache,
+        ndk_revision=toolchain.revision,
+        android_api=build.android_api.level,
+        host=build.triple,
+        readelf=str(toolchain.readelf),
+        source_date_epoch=source_date_epoch,
+    )
+    built_prefix, cpython = build_cpython(
+        workspace=workspace / "cpython",
+        cache=cache,
+        dependency_prefix=dependency_prefix,
+        android_api=build.android_api.level,
+        host=build.triple,
+        tzpath=runtime_data.get("tzpath"),
+        readelf=str(toolchain.readelf),
+        source_date_epoch=source_date_epoch,
+        lock_path=build.input_lock_path(),
+    )
+
+    curated = workspace / "curated"
+    shutil.rmtree(curated, ignore_errors=True)
+    curation = curate_prefix(built_prefix, curated)
+
+    return PrefixSource(
+        prefix=curated,
+        python_version=cpython["python_version"],
+        python_mm=".".join(cpython["python_version"].split(".")[:2]),
+        record={
+            "producer": "cpython-source",
+            "lock": build.input_lock,
+            "cpython": cpython,
+            "dependencies": dependencies,
+            "curation": curation,
+            "runtime_data": runtime_data,
+        },
+        retained=None,
+        needs_launcher=False,
+    )
 
 
 def verify_prefix(prefix: Path, *, android_api: int, readelf: str) -> dict[str, Any]:

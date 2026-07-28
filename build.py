@@ -25,6 +25,7 @@ from pythonbuild.assemble import (
     stripped_shares_non_elf_bytes,
     verify_projection,
 )
+from pythonbuild.cpython_source import prepare_source_prefix
 from pythonbuild.downloads import DEFAULT_CACHE, acquire
 from pythonbuild.targets import get_build, load_builds
 from pythonbuild.toolchain import resolve_toolchain
@@ -39,6 +40,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tag", required=True, help="release tag, e.g. 20260727")
     parser.add_argument("--output-dir", default="build", type=Path)
     parser.add_argument("--cache", default=DEFAULT_CACHE, type=Path)
+    parser.add_argument(
+        "--work-dir",
+        default=Path("work"),
+        type=Path,
+        help="where source builds happen; kept between runs so the build interpreter is reused",
+    )
     parser.add_argument(
         "--skip-verify", action="store_true", help="skip the projection cross-checks"
     )
@@ -67,19 +74,22 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     print(f"==> {build.name}, minimum Android API {build.android_api.level}", flush=True)
-    if not build.from_upstream_prebuilt:
-        print(
-            f"{build.name} is produced from CPython source, which is not wired into "
-            "build.py yet; see pythonbuild/cpython_source.py",
-            file=sys.stderr,
+
+    if build.from_upstream_prebuilt:
+        with tempfile.TemporaryDirectory(prefix="pbsa-input-") as tmp:
+            print("==> acquiring the pinned input", flush=True)
+            upstream = acquire(context.lock["archive"], args.cache, what="official Android package")
+            source = prepare_upstream_prefix(context, upstream, Path(tmp))
+            print("==> assembling full", flush=True)
+            full = assemble_full(context, source)
+    else:
+        print("==> building the dependencies and CPython from source", flush=True)
+        source = prepare_source_prefix(
+            build=build,
+            toolchain=context.toolchain,
+            workspace=args.work_dir.resolve() / build.artifact_infix,
+            cache=args.cache,
         )
-        return 2
-
-    with tempfile.TemporaryDirectory(prefix="pbsa-input-") as tmp:
-        print("==> acquiring the pinned input", flush=True)
-        upstream = acquire(context.lock["archive"], args.cache, what="official Android package")
-        source = prepare_upstream_prefix(context, upstream, Path(tmp))
-
         print("==> assembling full", flush=True)
         full = assemble_full(context, source)
     full_archive = context.output_dir / full["artifact"]["filename"]

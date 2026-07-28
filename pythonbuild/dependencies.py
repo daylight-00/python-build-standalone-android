@@ -19,6 +19,7 @@ dependency set built at two different API levels.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import shutil
@@ -130,6 +131,15 @@ def resolved_compiler(repo: Path, host: str, environment: dict[str, str]) -> str
     return Path(result.stdout.strip()).name
 
 
+def content_digest(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """A digest over what an archive contained, independent of how it was packed."""
+    files = sorted((row["path"], row["sha256"]) for row in rows if row["type"] == "file")
+    digest = hashlib.sha256()
+    for path, sha256 in files:
+        digest.update(f"{path}\0{sha256}\0".encode())
+    return {"file_count": len(files), "sha256": digest.hexdigest()}
+
+
 def build_dependencies(
     *,
     workspace: Path,
@@ -138,6 +148,7 @@ def build_dependencies(
     android_api: int,
     host: str,
     readelf: str,
+    source_date_epoch: int,
     lock_path: Path = RECIPE_LOCK,
 ) -> tuple[Path, dict[str, Any]]:
     """Build every dependency from source and merge them into one prefix."""
@@ -145,11 +156,16 @@ def build_dependencies(
     repo = workspace / "recipes"
     commit = _acquire_recipes(lock["recipes"]["repository"], lock["recipes"]["commit"], repo)
 
+    # From scratch every time. The workspace persists between runs so the clone
+    # and the downloads are reused, but a prefix left behind would merge with
+    # this one and make the result depend on what was built before.
     prefix = workspace / "prefix"
-    prefix.mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(prefix, ignore_errors=True)
+    prefix.mkdir(parents=True)
 
     environment = dict(os.environ)
     environment["ANDROID_API_LEVEL"] = str(android_api)
+    environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
 
     # One revision, so the overrides are applied once and every component is
     # built the same way.
@@ -194,15 +210,19 @@ def build_dependencies(
         produced = download_dir / host / f"{name}-{version}-{component['build']}-{host}.tar.gz"
         if not produced.is_file():
             raise RuntimeError(f"{name} recipe did not produce {produced}")
-        safe_extract_tar(produced, prefix)
+        rows = safe_extract_tar(produced, prefix)
 
+        # The identity of what the component contributed, not of the tarball the
+        # recipe wrapped it in: that wrapper is written with `tar -czf`, whose
+        # gzip header carries the time it ran, so its hash changes every build
+        # while the contents do not.
         records.append(
             {
                 "name": name,
                 "version": version,
                 "build": component["build"],
                 "source": file_identity(source),
-                "produced": file_identity(produced),
+                "content": content_digest(rows),
             }
         )
 
@@ -214,6 +234,7 @@ def build_dependencies(
         "overrides": applied,
         "android_api": android_api,
         "ndk_revision": ndk_revision,
+        "source_date_epoch": source_date_epoch,
         "host": host,
         "components": records,
         "objects": verify_prefix(prefix, android_api=android_api, readelf=readelf),
