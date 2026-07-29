@@ -5,26 +5,40 @@ while it is happening: output captured into a buffer and shown only on failure
 leaves the log blank for the whole build, which is exactly the situation where
 the log is the only way to see where it stopped.
 
-Absolute imports are the default, so this module does not shadow the standard
-library ``logging`` for anything that asks for it. Upstream places its own
-logger at the same path.
+``set_logger`` and ``log`` follow upstream's module of the same name, including
+its ``prefix> message`` format, so a line from either project reads the same.
+
+Two deliberate differences. Upstream's ``log`` also writes to a log file set
+through ``set_logger``; nothing here consumes one, and a handle that is always
+``None`` is machinery pretending to be a feature. And upstream's ``log_raw``
+writes bytes to that file only, which is the opposite of what is needed here —
+so the passthrough is called ``log_output`` rather than borrowing a name that
+means something else. Absolute imports are the default, so neither module
+shadows the standard library ``logging``.
 """
 
 from __future__ import annotations
 
 import sys
 
-# Progress lines this project emits are marked; lines a tool produced are passed
-# through unchanged, so a reader can tell which is which in one stream.
-PREFIX = "==> "
+DEFAULT_PREFIX = "build"
+_PREFIX = [DEFAULT_PREFIX]
+
+
+def set_logger(prefix: str) -> None:
+    """Name the thing whose progress is being reported."""
+    _PREFIX[0] = prefix
 
 
 def log(message: str) -> None:
     """Announce a step this project is taking."""
-    print(f"{PREFIX}{message}", flush=True)
+    print(f"{_PREFIX[0]}> {message}", flush=True)
 
 
-def log_raw(line: str) -> None:
+def log_output(line: str) -> None:
     """Pass a line from a tool the build ran through untouched."""
     sys.stdout.write(line if line.endswith("\n") else line + "\n")
     sys.stdout.flush()
+
+
+__all__ = ["DEFAULT_PREFIX", "log", "log_output", "set_logger"]

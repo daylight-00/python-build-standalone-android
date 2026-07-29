@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from .logging import log, log_raw
+from .logging import log, log_output
 
 CHUNK = 1024 * 1024
 
@@ -30,7 +30,9 @@ def sha256_text(value: str) -> str:
 
 
 def canonical_json(value: Any) -> bytes:
-    return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    return (
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -50,13 +52,19 @@ def read_json_object(path: StrPath) -> dict[str, Any]:
 
 
 def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, text=True, capture_output=True, check=False, **kwargs)
+    return subprocess.run(
+        command, text=True, capture_output=True, check=False, **kwargs
+    )
 
 
-def run_checked(command: list[str], what: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+def run_checked(
+    command: list[str], what: str, **kwargs: Any
+) -> subprocess.CompletedProcess[str]:
     result = run(command, **kwargs)
     if result.returncode:
-        raise RuntimeError(f"{what} failed: {result.stderr.strip() or result.stdout.strip()}")
+        raise RuntimeError(
+            f"{what} failed: {result.stderr.strip() or result.stdout.strip()}"
+        )
     return result
 
 
@@ -82,7 +90,7 @@ def run_logged(command: list[str], what: str, **kwargs: Any) -> None:
     with process:
         assert process.stdout is not None
         for line in process.stdout:
-            log_raw(line)
+            log_output(line)
     if process.returncode:
         raise RuntimeError(f"{what} failed with exit status {process.returncode}")
 
@@ -99,7 +107,9 @@ def require_identity(path: Path, expected: dict[str, Any], what: str) -> dict[st
     """Compare a file against a locked filename/size/sha256 triple."""
     observed = file_identity(path)
     mismatched = [
-        key for key in ("filename", "size_bytes", "sha256") if observed[key] != expected.get(key)
+        key
+        for key in ("filename", "size_bytes", "sha256")
+        if observed[key] != expected.get(key)
     ]
     if mismatched:
         raise RuntimeError(

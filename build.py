@@ -27,7 +27,7 @@ from pythonbuild.assemble import (
 )
 from pythonbuild.cpython_source import prepare_source_prefix
 from pythonbuild.downloads import DEFAULT_CACHE, acquire
-from pythonbuild.logging import log
+from pythonbuild.logging import log, set_logger
 from pythonbuild.targets import get_build, load_builds
 from pythonbuild.toolchain import resolve_toolchain
 from pythonbuild.utils import write_json
@@ -36,7 +36,9 @@ from pythonbuild.utils import write_json
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--target", required=True, help="triple or triple:build-option from ci-targets.yaml"
+        "--target",
+        required=True,
+        help="triple or triple:build-option from ci-targets.yaml",
     )
     parser.add_argument("--tag", required=True, help="release tag, e.g. 20260727")
     parser.add_argument("--output-dir", default="dist", type=Path)
@@ -74,12 +76,15 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output_dir.resolve(),
     )
 
-    log(f"{build.name}, minimum Android API {build.android_api.level}")
+    set_logger(build.name)
+    log(f"minimum Android API {build.android_api.level}")
 
     if build.from_upstream_prebuilt:
         with tempfile.TemporaryDirectory(prefix="pbsa-input-") as tmp:
             log("acquiring the pinned input")
-            upstream = acquire(context.lock["archive"], args.cache, what="official Android package")
+            upstream = acquire(
+                context.lock["archive"], args.cache, what="official Android package"
+            )
             source = prepare_upstream_prefix(context, upstream, Path(tmp))
             log("assembling full")
             full = assemble_full(context, source)
@@ -108,7 +113,9 @@ def main(argv: list[str] | None = None) -> int:
         log("verifying install_only is an exact projection of full")
         checks["projection"] = verify_projection(full_archive, install_only_archive)
         log("verifying the stripped flavor only changed ELF payloads")
-        checks["stripped"] = stripped_shares_non_elf_bytes(install_only_archive, stripped_archive)
+        checks["stripped"] = stripped_shares_non_elf_bytes(
+            install_only_archive, stripped_archive
+        )
 
     receipt = {
         "schema_version": 1,
@@ -144,7 +151,9 @@ def main(argv: list[str] | None = None) -> int:
     print()
     for record in (full, install_only, stripped):
         artifact = record["artifact"]
-        print(f"{artifact['sha256']}  {artifact['size_bytes']:>10}  {artifact['filename']}")
+        print(
+            f"{artifact['sha256']}  {artifact['size_bytes']:>10}  {artifact['filename']}"
+        )
     print(f"\nreceipt: {receipt_path}")
     return 0
 
