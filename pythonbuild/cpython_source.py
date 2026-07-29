@@ -329,15 +329,26 @@ def verify_install_prefix(
         raise RuntimeError(f"no libpython was built into {prefix}")
 
     mismatched = []
+    unstamped = []
     for path in objects:
+        rel = path.relative_to(prefix).as_posix()
         note = android_note(path, readelf)
-        if note is not None and note["api_level"] != android_api:
-            mismatched.append(
-                f"{path.relative_to(prefix).as_posix()} reports {note['api_level']}"
-            )
+        if note is None:
+            unstamped.append(rel)
+        elif note["api_level"] != android_api:
+            mismatched.append(f"{rel} reports {note['api_level']}")
     if mismatched:
         raise RuntimeError(
             f"objects were not built for API {android_api}: {', '.join(mismatched[:5])}"
+        )
+    # Every member of a finished distribution is an executable or a shared object
+    # the NDK produced, and the NDK stamps all of those. A missing note used to
+    # be tolerated, which made the whole check pass silently whenever the note
+    # could not be read — the failure mode it exists to prevent.
+    if unstamped:
+        raise RuntimeError(
+            f"objects carry no .note.android.ident, so the API level they were "
+            f"built for cannot be confirmed: {', '.join(unstamped[:5])}"
         )
 
     sample = android_note(libpython[0], readelf) or {}

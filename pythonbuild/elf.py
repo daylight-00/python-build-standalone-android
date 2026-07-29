@@ -22,6 +22,10 @@ from .utils import run, sha256_path
 DYNAMIC_RE = re.compile(r"\((NEEDED|SONAME|RPATH|RUNPATH)\).*\[(.*)\]")
 PAGE_SIZE = 16384
 
+# The section the NDK stamps the API level into. Both readelf implementations
+# name it in their output; only the note type's spelling differs between them.
+ANDROID_NOTE_SECTION = ".note.android.ident"
+
 REMOVABLE_SECTIONS = {".symtab", ".strtab"}
 REMOVABLE_SECTION_PREFIXES = (".debug", ".zdebug")
 
@@ -189,10 +193,15 @@ def android_note(path: Path, readelf: str = "readelf") -> dict[str, Any] | None:
         raise RuntimeError(
             f"readelf could not read notes from {path}: {result.stderr.strip()}"
         )
-    if "NT_ANDROID_TYPE_IDENT" not in result.stdout:
+    # Anchored on the section rather than the note type, because the two readelf
+    # implementations spell the type differently: LLVM prints
+    # NT_ANDROID_TYPE_IDENT and GNU binutils prints NT_VERSION. Keying on the
+    # LLVM spelling made this return None for every object under GNU readelf,
+    # and a None is treated as "no note to check" by the callers.
+    if ANDROID_NOTE_SECTION not in result.stdout:
         return None
 
-    tail = result.stdout.split("NT_ANDROID_TYPE_IDENT", 1)[1]
+    tail = result.stdout.split(ANDROID_NOTE_SECTION, 1)[1]
     marker = "description data:"
     if marker not in tail:
         return None
