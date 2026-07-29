@@ -23,7 +23,7 @@
   },
   "build_flow": {
     "driver": "Android/android.py",
-    "dependency_lock": "config/source/android-deps-aarch64-linux-android.lock.json",
+    "dependency_lock": "config/source/dependency-recipes.lock.json",
     "dependency_producer": "beeware/cpython-android-source-deps",
     "dependency_binding": "the exact release assets pinned by CPython 3.14.6 Android/unpack_deps"
   },

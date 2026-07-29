@@ -111,3 +111,34 @@ class LicenseManifestTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LockReferenceTest(unittest.TestCase):
+    """A path a lock names has to exist.
+
+    `build_flow.dependency_lock` named `android-deps-aarch64-linux-android.lock.json`
+    for as long as it existed, and no such file ever did. Nothing read the field,
+    so nothing noticed.
+    """
+
+    def test_every_path_a_lock_names_exists(self) -> None:
+        for build in load_builds().values():
+            lock = read_json_object(build.input_lock_path())
+            for key, value in _paths_in(lock):
+                with self.subTest(build=build.name, key=key):
+                    self.assertTrue((ROOT / value).is_file(), f"{key} -> {value}")
+
+
+def _paths_in(value: object, key: str = "$") -> list[tuple[str, str]]:
+    """Every value that looks like a repository path this lock points at."""
+    found: list[tuple[str, str]] = []
+    if isinstance(value, dict):
+        for name, child in value.items():
+            found += _paths_in(child, f"{key}.{name}")
+    elif (
+        isinstance(value, str)
+        and value.startswith("config/")
+        and value.endswith(".json")
+    ):
+        found.append((key, value))
+    return found

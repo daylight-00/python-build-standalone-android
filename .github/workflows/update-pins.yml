@@ -1,0 +1,85 @@
+name: update-pins
+
+# Follow python.org's newest patch of the pinned series, unattended.
+#
+# A patch bump moves the pinned bytes and nothing else, which is the one case the
+# release waiver covers: everything from here on is automatic — the build
+# workflow builds and validates the PR, and the api-level workflow re-measures
+# the floor because `config/**` changed. A device is needed only to take the
+# resulting release out of prerelease.
+#
+# It opens a pull request rather than committing to main. The point of the
+# automation is to notice, not to decide.
+
+on:
+  schedule:
+    # Weekly. CPython patches land every month or two, and a day's delay in
+    # noticing costs nothing.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      write:
+        description: "Open a pull request if a newer patch exists."
+        type: boolean
+        default: true
+
+env:
+  FORCE_COLOR: 1
+
+permissions: {}
+
+jobs:
+  follow:
+    name: follow the newest patch
+    runs-on: ubuntu-latest
+    permissions:
+      # The branch the pull request is opened from, and the request itself.
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: true
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
+      - name: Report what is pinned and what is available
+        run: uv run ./update-pins.py
+
+      - name: Follow it
+        if: ${{ github.event_name == 'schedule' || inputs.write }}
+        id: follow
+        run: |
+          uv run ./update-pins.py --write | tee pins.log
+          # Assigned first: `echo "x=$(git ...)"` would report echo's status.
+          changed=$(git status --porcelain -- config ci-targets.yaml | wc -l)
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Open a pull request
+        if: ${{ steps.follow.outputs.changed != '0' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(uv run python -c "
+          from pythonbuild.targets import get_build
+          from pythonbuild.utils import read_json_object
+          print(read_json_object(get_build('aarch64-linux-android').input_lock_path())['python']['version'])
+          ")
+          branch="pins/cpython-$version"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A config ci-targets.yaml
+          git commit -m "chore(pins): follow CPython $version
+
+          Both builds read their input from the same python.org release directory, so one bump moves the source tarball and the official Android package together. The dependency set is re-read from the new source's Android/android.py rather than carried over: its versions are CPython's choice, not this project's.
+
+          The API floor is not touched here. It is measured, and the api-level workflow re-measures it because config/ changed."
+          git push -u origin "$branch"
+          gh pr create --fill --base main --head "$branch" \
+            --body-file pins.log || \
+            gh pr create --fill --base main --head "$branch"

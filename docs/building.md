@@ -83,6 +83,18 @@ $ ./check.py --fix    # apply what ruff can apply
 `ruff.toml` and `mypy.ini` decide what is checked, so no command line has to be
 kept in step with them.
 
+## Following a new CPython patch
+
+```console
+$ ./update-pins.py            # report
+$ ./update-pins.py --write    # move both builds to the newest patch
+```
+
+One version directory on python.org serves both builds, and the dependency set is
+re-read from the new source rather than carried over. See
+[following upstream](technotes.md#following-upstream). A weekly workflow does
+this and opens a pull request.
+
 ## The flagship's API floor
 
 `ci-targets.yaml` declares it, and the rule it declares is measured rather than

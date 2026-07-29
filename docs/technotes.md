@@ -217,6 +217,40 @@ than its `install_only`, where the upstream-derived pair differ by a few
 kilobytes — the official package arrives already stripped, so for that build the
 stripped flavor is close to a formality.
 
+## Following upstream
+
+Only CPython's version is watched. Everything else follows from whichever version
+is pinned, which is why there is one discovery policy here where upstream keeps
+one per package.
+
+The official Android package lives in the same python.org directory as the source
+tarball, so a single listing covers both builds. And the dependency set is not
+this project's choice at all: `Android/android.py` names the exact release assets
+its own build unpacks, and the source build compiles those same versions, so the
+set is read out of the pinned source rather than tracked separately. Bumping
+OpenSSL because a newer one exists would leave the interpreter built against a
+dependency set CPython does not expect — the derivation is what prevents that,
+and `update-pins.py` re-reads it on every bump.
+
+```console
+$ ./update-pins.py            # what is pinned, and what python.org has
+$ ./update-pins.py --write    # move the pins to the newest patch of the series
+```
+
+A weekly workflow runs it and opens a pull request when the series has moved. It
+opens a request rather than committing, because the point of the automation is to
+notice rather than to decide. From there everything is automatic: the build
+workflow builds and validates the request, and the api-level workflow re-measures
+the floor because `config/**` changed. Only taking the resulting release out of
+prerelease needs a device.
+
+A patch bump is exactly the case [the waiver](#releasing-without-one) covers —
+the pinned bytes move and nothing this project owns does.
+
+New series are a separate decision, not something this follows. `upstream` cannot
+exist before 3.14, because python.org publishes no Android package for earlier
+series, and every series added costs a device qualification per release forever.
+
 ## Release model
 
 Releases are manual, as upstream: `workflow_dispatch` with an explicit tag and

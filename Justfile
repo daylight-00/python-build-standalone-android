@@ -40,6 +40,10 @@ test *args:
 validate +archives:
   uv run ./validate-distribution.py {{archives}}
 
+# Report or follow python.org's newest patch of the pinned series.
+pins *args:
+  uv run ./update-pins.py {{args}}
+
 # Measure the API floor the flagship's stated rule selects.
 api-level *args:
   uv run ./resolve-api-level.py {{args}}

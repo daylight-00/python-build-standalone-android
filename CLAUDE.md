@@ -85,6 +85,7 @@ $ python3 qualify.py <archive> --expected-api <n>          # on a device, stdlib
 $ ./check.py [--fix]                                       # lint, types, tests
 $ ./ci-matrix.py                                           # the CI build matrix
 $ ./resolve-api-level.py [--check]                         # measure the flagship API floor
+$ ./update-pins.py [--write]                               # follow python.org's newest patch
 ```
 
 `just` recipes wrap these; `just --list` shows them. Releases are manual,
