@@ -220,11 +220,14 @@ jobs:
             git switch latest-release
           else
             git switch --orphan latest-release
-            git rm -rq --cached . 2>/dev/null || true
           fi
+          # The branch carries the catalogs and nothing else. Machines fetch from
+          # it by raw URL, and `git add -A -- '*.json'` matched at every depth, so
+          # each release also published its own build receipts here.
+          git rm -rq --cached . 2>/dev/null || true
           find . -maxdepth 1 -name '*.json' -delete
           cp dist/download-metadata*.json dist/latest-release.json .
-          git add -A -- '*.json'
+          git add -- ./download-metadata*.json ./latest-release.json
           git commit -m "chore: publish $TAG catalogs"
           git push origin latest-release
 
