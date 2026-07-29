@@ -35,6 +35,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def render(receipts: list[dict[str, Any]], tag: str, repository: str) -> str:
     builds = load_builds()
+    # Ordered by build, flagship first, rather than by whatever order the receipts
+    # were found in: they sort one way when a release collects them per artifact
+    # directory and another way when they sit in one, and the notes should not.
+    receipts = sorted(
+        receipts,
+        key=lambda receipt: (
+            receipt["build_option"] != DEFAULT_BUILD_OPTION,
+            receipt["build_option"],
+        ),
+    )
     lines: list[str] = []
 
     lines.append("## Builds")
@@ -45,7 +55,10 @@ def render(receipts: list[dict[str, Any]], tag: str, repository: str) -> str:
         option = receipt["build_option"]
         name = "*(default)*" if option == DEFAULT_BUILD_OPTION else f"`{option}`"
         api = receipt["android_api"]["level"]
-        policy = receipt["android_api"]["policy"].replace("-", " ")
+        # Verbatim, in backticks: it is the identifier ci-targets.yaml states, and
+        # de-hyphenating it produced prose that was neither the identifier nor a
+        # sentence. What it means is in the documentation.
+        policy = f"`{receipt['android_api']['policy']}`"
         version = receipt["flavors"]["full"]["python_version"]
         lines.append(f"| {name} | API {api} | {version} | {policy} |")
     lines.append("")
@@ -53,10 +66,26 @@ def render(receipts: list[dict[str, Any]], tag: str, repository: str) -> str:
     lines.append("## Installing with uv")
     lines.append("")
     for receipt in receipts:
-        key = f"{receipt['triple']}:{receipt['build_option']}"
-        build = builds.get(key)
+        # Matched on the fields rather than on a reconstructed key: the key form
+        # drops `:default`, and building it here silently left the flagship out of
+        # the one section a reader follows to install anything.
+        build = next(
+            (
+                candidate
+                for candidate in builds.values()
+                if candidate.triple == receipt["triple"]
+                and candidate.build_option == receipt["build_option"]
+            ),
+            None,
+        )
         if build is None:
-            continue
+            raise RuntimeError(
+                f"{receipt['triple']}:{receipt['build_option']} has a receipt but no "
+                f"entry in ci-targets.yaml"
+            )
+        label = "the flagship" if build.build_option == DEFAULT_BUILD_OPTION else "the baseline"
+        lines.append(f"`{build.name}`, {label}:")
+        lines.append("")
         lines.append(
             f"```console\n"
             f"$ uv python install cpython-{receipt['flavors']['full']['python_version']}"
