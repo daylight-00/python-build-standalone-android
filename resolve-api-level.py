@@ -28,13 +28,10 @@ from pythonbuild.api_level import Resolution, decisions, resolve
 from pythonbuild.downloads import DEFAULT_CACHE, acquire
 from pythonbuild.logging import log, set_logger
 from pythonbuild.targets import get_build
-from pythonbuild.toolchain import max_api_level, resolve_ndk
+from pythonbuild.toolchain import resolve_ndk, supported_api_levels
 from pythonbuild.utils import read_json_object, run_logged
 
 ANDROID_DRIVER = "Android/android.py"
-# Below the oldest level the official package supports there is nothing this
-# project would ever ship, so the search does not go there.
-LOWEST_CANDIDATE = 21
 
 
 def extract_source(archive: Path, destination: Path) -> Path:
@@ -152,8 +149,11 @@ def main(argv: list[str] | None = None) -> int:
     build = get_build(args.target)
     set_logger("api-level")
     ndk = resolve_ndk(build.ndk)
-    ndk_max = max_api_level(ndk)
-    log(f"NDK {build.ndk} compiles up to API {ndk_max}")
+    # The search bounds are the toolchain's own, so neither is a number typed
+    # in here that could fall out of step with the pinned revision.
+    levels = supported_api_levels(ndk)
+    ndk_max = levels.stop - 1
+    log(f"NDK {build.ndk} compiles for API {levels.start} through {ndk_max}")
 
     workspace = args.workspace.resolve()
     lock = read_json_object(build.input_lock_path())
@@ -176,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     configurer.prepare_build_python()
 
-    resolution = resolve(configurer, lowest=LOWEST_CANDIDATE, ndk_max=ndk_max)
+    resolution = resolve(configurer, lowest=levels.start, ndk_max=ndk_max)
     report(resolution, build.android_api.level)
 
     if resolution.level != build.android_api.level:

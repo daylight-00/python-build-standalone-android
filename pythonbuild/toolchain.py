@@ -111,18 +111,20 @@ def resolve_ndk(revision: str) -> Path:
     )
 
 
-def max_api_level(ndk: Path, arch_triple: str = "aarch64-linux-android") -> int:
-    """The highest API level this NDK can compile for.
+def supported_api_levels(
+    ndk: Path, arch_triple: str = "aarch64-linux-android"
+) -> range:
+    """Every API level this NDK can compile for.
 
     Read off the sysroot rather than written down: the NDK ships one library
-    directory per level it supports, and r27 stopping at 35 is a property of the
-    revision the toolchain lock pins, not a number this project chooses.
+    directory per level it supports, so r27 covering 21 to 35 is a property of
+    the revision the toolchain lock pins, not a pair of numbers typed in here.
     """
     libdir = _sysroot(ndk) / "usr/lib" / arch_triple
-    levels = [int(path.name) for path in libdir.iterdir() if path.name.isdigit()]
+    levels = sorted(int(path.name) for path in libdir.iterdir() if path.name.isdigit())
     if not levels:
         raise RuntimeError(f"no per-API library directories under {libdir}")
-    return max(levels)
+    return range(levels[0], levels[-1] + 1)
 
 
 def _sysroot(ndk: Path) -> Path:
