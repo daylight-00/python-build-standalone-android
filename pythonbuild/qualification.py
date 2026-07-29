@@ -27,6 +27,19 @@ def receipt_path(build: Build, tag: str, root: Path = QUALIFICATION_ROOT) -> Pat
     return root / tag / f"{build.artifact_infix}.json"
 
 
+def _display_path(path: Path) -> str:
+    """Repository-relative where that is meaningful, and the whole path where it is not.
+
+    ``root`` is a parameter so a caller can point somewhere else, and every such
+    caller used to crash here: the result was reported with ``relative_to(ROOT)``,
+    which raises for anything outside the repository.
+    """
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def _passing_api_levels(directory: Path) -> dict[str, int]:
     """The API level each passing receipt in ``directory`` recorded, by artifact infix."""
     levels: dict[str, int] = {}
@@ -148,7 +161,7 @@ def verify(
     runtime_data = _check_runtime_data(build, checks, path)
 
     return {
-        "receipt": path.relative_to(ROOT).as_posix(),
+        "receipt": _display_path(path),
         "executed_artifact": executed["filename"],
         "artifacts_covered": len(artifacts),
         "device": {
