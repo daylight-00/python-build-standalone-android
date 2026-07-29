@@ -13,6 +13,14 @@ the release by SHA-256, and the receipts are committed under
 names, so what follows describes the artifacts a release actually shipped rather
 than the project in general.
 
+A release may also be published without one, when nothing but the pinned CPython
+input has changed since the last release that had one. Such a release is marked
+as a prerelease, says so at the top of its notes, and does **not** become what
+`uv python install` resolves to — the catalogs keep pointing at the last
+qualified release. So the scope below describes qualified releases; a prerelease
+is what it says on its own notes. See
+[releasing without one](technotes.md#releasing-without-one).
+
 The predecessor research repository qualified equivalent artifacts on real
 hardware, but those receipts are bound to bytes produced by a different
 toolchain on a different host. They do not carry over.

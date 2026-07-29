@@ -256,6 +256,40 @@ against an earlier build cannot be carried forward silently. The gate also
 checks that the device's ABI is one this project releases for and that the
 interpreter reported the API level the build declares.
 
+### Releasing without one
+
+A device receipt cannot be produced unattended, and that makes the gate the one
+thing standing between this project and a release that follows a new CPython on
+its own. `allow-waiver` opens it, and does so without weakening what a receipt
+means — nothing claims an older one covers newer bytes.
+
+The claim it makes instead is weaker and true. If the only difference between the
+last build a device ran and this one is the pinned CPython input, then the
+launcher, the loader normalization, the metadata overlay, the curation and the
+licence set are the same code that was qualified, and the residual risk belongs
+to upstream. That is a risk an unattended release can reasonably take. If
+anything else differs, the risk is this project's own and the receipt is
+required.
+
+`pythonbuild/waiver.py` decides it, and the polarity is deliberate: it names what
+is *allowed* to differ and blocks on everything else, so a file nobody considered
+fails closed. Two things sit outside the allowance on purpose.
+`config/toolchain.lock.json` is upstream in origin but not in effect — an NDK
+bump changes every compiled byte and can move the API floor. And a floor that
+moved blocks a waiver by itself, because a different floor means a different set
+of devices, which no amount of unchanged packaging stands in for.
+
+What a waived release is not is the default. It is published as a prerelease, its
+notes open with the fact, and `latest-release` and the uv catalogs are left
+pointing at the last qualified release — so `uv python install` keeps resolving
+to bytes a device ran, and taking a waived build is an explicit act. Promoting
+one means qualifying those exact artifacts, committing the receipt, and
+re-releasing without the waiver.
+
+The verdict travels with the artifacts as
+`<build>.qualification.json` rather than being inferred from what the operator
+asked for: a release is qualified when every build in it was.
+
 ## uv integration
 
 uv's managed-Python key is `{implementation}-{version}-{os}-{arch}-{libc}`, and

@@ -43,6 +43,8 @@ These hold for every build. Breaking one is a bug even when tests pass.
   built before. This one has bitten three times.
 - **A qualification receipt is evidence only for the bytes it names.** It binds
   artifacts by SHA-256. Never widen a receipt to cover a build it did not run.
+  A release may go out without one — see `pythonbuild/waiver.py` — but only by
+  making a weaker claim of its own, never by stretching a receipt.
 - **Metadata is never invented, and is omitted only where the format allows.**
   A field describing something this project did not produce is left out when it
   is optional and made empty when it is required — an empty list of object files
