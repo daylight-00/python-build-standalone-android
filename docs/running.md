@@ -25,7 +25,7 @@ https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/la
 | Build option | Minimum Android | Notes |
 | --- | --- | --- |
 | `upstream` | 7.0 (API 24) | widest device coverage; the permanent baseline |
-| *(none)* | 14 (API 34) | the flagship: faster, HTTPS and time zones work out of the box |
+| *(none)* | 14 (API 34) | the flagship: faster, and HTTPS works out of the box |
 
 Both are `arm64-v8a`. See [`design.md`](design.md#the-android-api-policy) for
 why each minimum is what it is, and
