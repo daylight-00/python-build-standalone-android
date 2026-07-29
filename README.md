@@ -41,13 +41,18 @@ left in place: a published name has to keep serving the bytes it was published
 with, since the catalog pins them by hash.
 
 The unmarked build is the flagship. Neither API level is chosen here — each
-follows a stated rule, described in the design document.
+follows a stated rule, described in the technical notes.
 
 ## Documentation
 
-- [`docs/design.md`](docs/design.md) — what this repository builds and why
+- [`docs/index.md`](docs/index.md) — where each document is
+- [`docs/technotes.md`](docs/technotes.md) — why the build is the way it is
+- [`docs/distributions.md`](docs/distributions.md) — the archive contract and its
+  metadata
+- [`docs/building.md`](docs/building.md) — building and checking one yourself
+- [`docs/quirks.md`](docs/quirks.md) — where Android differs from a POSIX host
 - [`docs/running.md`](docs/running.md) — obtaining and running distributions
-- [`docs/support.md`](docs/support.md) — the supported runtime scope, and what
+- [`docs/status.md`](docs/status.md) — the supported runtime scope, and what
   is explicitly not supported
 
 Design questions are settled in [cpython-android-cli][research] and land here
@@ -58,7 +63,7 @@ only as build recipes.
 This repository's own source is MIT. The distributions it publishes contain
 third-party code under its own terms — CPython under the Python license, OpenSSL
 under Apache-2.0, and others. See
-[`docs/design.md`](docs/design.md#licensing) for the full picture.
+[`docs/distributions.md`](docs/distributions.md#licensing) for the full picture.
 
 [pbs]: https://github.com/astral-sh/python-build-standalone
 [releases]: https://github.com/daylight-00/python-build-standalone-android/releases

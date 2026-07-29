@@ -27,9 +27,9 @@ https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/la
 | `upstream` | 7.0 (API 24) | widest device coverage; the permanent baseline |
 | *(none)* | 14 (API 34) | the flagship: faster, and HTTPS works out of the box |
 
-Both are `arm64-v8a`. See [`design.md`](design.md#the-android-api-policy) for
+Both are `arm64-v8a`. See [`technotes.md`](technotes.md#the-android-api-policy) for
 why each minimum is what it is, and
-[why a source build is worth having](design.md#why-a-source-build-is-worth-having)
+[why a source build is worth having](technotes.md#why-a-source-build-is-worth-having)
 for the measured difference.
 
 ## With uv

@@ -76,7 +76,9 @@ def _sanitize(value: str) -> str:
 
 
 def _config_vars(raw: dict[str, Any], layout: Layout, build: Build) -> dict[str, str]:
-    values = {str(key): _sanitize(_as_string(value)) for key, value in sorted(raw.items())}
+    values = {
+        str(key): _sanitize(_as_string(value)) for key, value in sorted(raw.items())
+    }
     values.update(
         {
             "prefix": "install",
@@ -122,7 +124,9 @@ def _links(needed: list[str], providers: dict[str, str]) -> list[dict[str, Any]]
     rows: list[dict[str, Any]] = []
     for name in sorted(set(needed)):
         if name in providers:
-            rows.append({"name": name, "path_dynamic": providers[name], "system": False})
+            rows.append(
+                {"name": name, "path_dynamic": providers[name], "system": False}
+            )
         else:
             rows.append({"name": name, "system": True})
     return rows
@@ -222,7 +226,9 @@ def build_python_json(
         (major << 24) | (minor << 16) | (micro << 8) | 0xF0
     )
     extension_suffixes = [
-        suffix for suffix in (abi.get("extension_suffix"), abi.get("stable_abi_suffix")) if suffix
+        suffix
+        for suffix in (abi.get("extension_suffix"), abi.get("stable_abi_suffix"))
+        if suffix
     ] or [layout.ext_suffix, ".abi3.so"]
 
     return {
@@ -302,6 +308,6 @@ def build_python_json(
         "licenses": CPYTHON_LICENSES,
         # Upstream keeps this at python/licenses/, a sibling of python/install/
         # that the install-only projection drops. Keeping it inside the prefix
-        # lands it at python/licenses/ there too. See docs/design.md.
+        # lands it at python/licenses/ there too. See docs/distributions.md.
         "license_path": "install/licenses/LICENSE.cpython.txt",
     }

@@ -15,8 +15,9 @@ go stale. Read the file.
 | --- | --- |
 | What builds exist, their API levels, what each compiles in | `ci-targets.yaml` |
 | Exact inputs and their checksums | `config/**/*.lock.json` |
-| Why anything is the way it is | `docs/design.md` |
-| What is supported, and what deliberately is not | `docs/support.md` |
+| Why anything is the way it is | `docs/technotes.md` |
+| What an archive contains and promises | `docs/distributions.md` |
+| What is supported, and what deliberately is not | `docs/status.md` |
 | What each component's license is and where its text came from | `licenses/components.json` |
 
 When code and one of these disagree, the file is not automatically right —
@@ -61,7 +62,10 @@ ELF note rather than trusting the build that claims to have set it.
   When this project diverges from astral's contract or patches an upstream
   recipe, the divergence and its justification are written down next to it.
 - **Derive constants from pinned inputs.** A value computed from a lock file
-  cannot drift out of step with one; a value typed into the source can.
+  cannot drift out of step with one; a value typed into the source can. The
+  same reasoning covers anything upstream already decided: the expected
+  extension modules come out of CPython's own configure record rather than a
+  table here, as the dependency set and the `upstream` API floor do.
 - **Guards over conventions.** If something must not reach a distribution, make
   the build fail on it. Several of these exist and each has caught something.
 - **Claims are sized to evidence.** "Runs on a given API level" and "was run on
@@ -73,6 +77,7 @@ ELF note rather than trusting the build that claims to have set it.
 ```console
 $ ./build.py --target <triple[:option]> --tag <YYYYMMDD>   # build one distribution
 $ ./check-qualification.py --target <…> --tag <…>          # does a receipt cover it
+$ ./validate-distribution.py <archive>…                    # hold finished bytes to the contract
 $ ./generate-catalog.py --target <…> --tag <…>             # uv download metadata
 $ python3 qualify.py <archive> --expected-api <n>          # on a device, stdlib only
 $ ./check.py [--fix]                                       # lint, types, tests

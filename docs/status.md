@@ -1,4 +1,4 @@
-# Support Scope
+# Support Status
 
 ## Status
 
@@ -27,7 +27,7 @@ One triple, `aarch64-linux-android`, `arm64-v8a` only.
 | *(none)* | 14 (API 34) | the last API level that changes the CPython build |
 
 The `extended` build that the [README](../README.md) and
-[`design.md`](design.md) describe is planned and unpublished. Nothing here
+[`technotes.md`](technotes.md) describe is planned and unpublished. Nothing here
 covers it, and this table gains a row when it ships.
 
 `upstream` is a permanent baseline, not a stepping stone. It exists so there is
@@ -58,11 +58,17 @@ These are deliberate boundaries, not gaps waiting to be filled:
   device against this distribution is not promised to load on another. Wheel
   repair is an external tool's responsibility.
 - **APK and JNI packaging.** The distributions are a command-line runtime.
+- **Build variants.** No PGO, LTO, BOLT, debug, free-threaded, or JIT build.
+  One build option per provenance is the whole axis.
+- **Detached symbols or a separate debug distribution.** The stripped flavor
+  drops them; nothing republishes them.
+- **A bundled cross-build NDK, SDK, or sysroot.** The build resolves a pinned
+  NDK and says how to install it; it does not carry one.
 
 ## Runtime contexts
 
 Termux on `arm64-v8a` is the context the distributions are designed for and the
-one the release process will qualify against. The flagship build compiles in
+one every release is qualified against. The flagship build compiles in
 Termux's CA and time zone paths as overridable defaults for that reason.
 
 That is a convenience, not a dependency: the runtime needs no Termux prefix and
