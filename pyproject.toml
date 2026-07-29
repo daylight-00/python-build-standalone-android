@@ -3,7 +3,7 @@ name = "python-build-standalone-android"
 version = "0.1.0"
 description = "Produces standalone, redistributable builds of CPython for Android."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "pkgconf>=3.0.1.post0",
     "pyyaml>=6.0.2",

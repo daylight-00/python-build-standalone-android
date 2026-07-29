@@ -20,7 +20,11 @@ from typing import Any
 
 from .archive import newest_member_mtime, safe_extract_tar
 from .assemble import BUILD_PLACEHOLDER, TOOLCHAIN_PLACEHOLDER, PrefixSource
-from .dependencies import bare_toolchain_override, build_dependencies, file_prefix_map_override
+from .dependencies import (
+    bare_toolchain_override,
+    build_dependencies,
+    file_prefix_map_override,
+)
 from .downloads import acquire
 from .elf import android_note, elf_objects
 from .targets import Build
@@ -35,11 +39,15 @@ def _extract_source(archive: Path, destination: Path) -> Path:
     safe_extract_tar(archive, destination)
     roots = [path for path in destination.iterdir() if path.is_dir()]
     if len(roots) != 1:
-        raise RuntimeError(f"expected one directory in the CPython source archive, got {roots}")
+        raise RuntimeError(
+            f"expected one directory in the CPython source archive, got {roots}"
+        )
     return roots[0]
 
 
-def _driver(source: Path, cross_build: Path, environment: dict[str, str], *args: str) -> None:
+def _driver(
+    source: Path, cross_build: Path, environment: dict[str, str], *args: str
+) -> None:
     run_logged(
         [sys.executable, str(source / ANDROID_DRIVER), *args],
         f"android.py {args[0]}",
@@ -87,7 +95,10 @@ def build_cpython(
     # environment script: the recipes' copy of it came from here.
     applied_overrides = [
         override.apply(source / "Android")
-        for override in (file_prefix_map_override(host_paths), bare_toolchain_override())
+        for override in (
+            file_prefix_map_override(host_paths),
+            bare_toolchain_override(),
+        )
     ]
 
     environment = dict(os.environ)
@@ -131,7 +142,9 @@ def build_cpython(
         "source_date_epoch": source_date_epoch,
         "overrides": applied_overrides,
         "driver": ANDROID_DRIVER,
-        "objects": verify_install_prefix(prefix, android_api=android_api, readelf=readelf),
+        "objects": verify_install_prefix(
+            prefix, android_api=android_api, readelf=readelf
+        ),
     }
 
 
@@ -173,7 +186,9 @@ def curate_prefix(source: Path, destination: Path) -> dict[str, Any]:
                 if path.is_symlink():
                     link = os.readlink(path)
                     if link.startswith("/"):
-                        raise RuntimeError(f"absolute symlink in the build prefix: {path}")
+                        raise RuntimeError(
+                            f"absolute symlink in the build prefix: {path}"
+                        )
                     target.symlink_to(link)
                 elif path.is_dir():
                     shutil.copytree(path, target, symlinks=True)
@@ -204,9 +219,13 @@ def curate_prefix(source: Path, destination: Path) -> dict[str, Any]:
         if any(path.name.startswith(prefix) for prefix in FORBIDDEN_IN_BIN)
     )
     if leaked:
-        raise RuntimeError(f"dependency command-line tools reached the distribution: {leaked}")
+        raise RuntimeError(
+            f"dependency command-line tools reached the distribution: {leaked}"
+        )
     if list(destination.glob("**/*.a")):
-        raise RuntimeError("static archives are build inputs and must not be distributed")
+        raise RuntimeError(
+            "static archives are build inputs and must not be distributed"
+        )
 
     return {
         "schema_version": 1,
@@ -232,7 +251,9 @@ def prepare_source_prefix(
     runtime_data = build.runtime_data
     # One timestamp for the whole build, taken from the primary pinned input.
     source_archive = acquire(
-        read_json_object(build.input_lock_path())["source_archive"], cache, what="CPython source"
+        read_json_object(build.input_lock_path())["source_archive"],
+        cache,
+        what="CPython source",
     )
     source_date_epoch = newest_member_mtime(source_archive)
 
@@ -294,7 +315,9 @@ def prepare_source_prefix(
     )
 
 
-def verify_install_prefix(prefix: Path, *, android_api: int, readelf: str) -> dict[str, Any]:
+def verify_install_prefix(
+    prefix: Path, *, android_api: int, readelf: str
+) -> dict[str, Any]:
     """Every object in the finished prefix must report the requested API level.
 
     The dependencies were already checked when they were built; this catches the
@@ -309,7 +332,9 @@ def verify_install_prefix(prefix: Path, *, android_api: int, readelf: str) -> di
     for path in objects:
         note = android_note(path, readelf)
         if note is not None and note["api_level"] != android_api:
-            mismatched.append(f"{path.relative_to(prefix).as_posix()} reports {note['api_level']}")
+            mismatched.append(
+                f"{path.relative_to(prefix).as_posix()} reports {note['api_level']}"
+            )
     if mismatched:
         raise RuntimeError(
             f"objects were not built for API {android_api}: {', '.join(mismatched[:5])}"

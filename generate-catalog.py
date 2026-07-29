@@ -14,7 +14,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from pythonbuild.catalog import CATALOG_FLAVOR, build_catalog, latest_release, merge_catalog
+from pythonbuild.catalog import (
+    CATALOG_FLAVOR,
+    build_catalog,
+    latest_release,
+    merge_catalog,
+)
 from pythonbuild.targets import get_build
 from pythonbuild.utils import read_json_object, write_json
 
@@ -67,7 +72,10 @@ def main(argv: list[str] | None = None) -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     catalog_path = args.output_dir / build.uv_catalog
     write_json(catalog_path, catalog)
-    write_json(args.output_dir / "latest-release.json", latest_release(args.repository, args.tag))
+    write_json(
+        args.output_dir / "latest-release.json",
+        latest_release(args.repository, args.tag),
+    )
 
     print(f"wrote {catalog_path} with {len(catalog)} entries")
     for key in catalog:

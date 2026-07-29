@@ -1,8 +1,17 @@
-target-version = "py312"
-line-length = 100
+# Both match upstream: it sets neither, so both are ruff's defaults there, and a
+# file formatted at 100 columns would be rewritten the moment it met upstream's
+# formatter. The lint selection below is a superset of upstream's ["F", "I", "B"];
+# a stricter selection costs nothing on the way in.
+target-version = "py310"
+line-length = 88
 # Named rather than inherited from .gitignore: what gets linted should not
 # change because an ignore rule did.
 extend-exclude = ["build", "dist", "dist-*", "downloads", "work"]
 
 [lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# The formatter already wraps everything it can at the line length above. What
+# E501 is left to report is prose in a comment or a string it cannot split, and
+# rewording an explanation to fit a column is not an improvement. Upstream does
+# not select E at all and has lines past 170.
+ignore = ["E501"]

@@ -35,7 +35,9 @@ class BuildTableTest(unittest.TestCase):
                 self.assertTrue(build.input_lock_path().is_file(), build.input_lock)
 
     def test_exactly_one_build_is_the_flagship(self) -> None:
-        flagships = [b for b in self.builds.values() if b.build_option == DEFAULT_BUILD_OPTION]
+        flagships = [
+            b for b in self.builds.values() if b.build_option == DEFAULT_BUILD_OPTION
+        ]
         self.assertEqual(len(flagships), 1)
 
     def test_the_flagship_carries_no_marker_and_the_others_do(self) -> None:
@@ -47,7 +49,9 @@ class BuildTableTest(unittest.TestCase):
                     self.assertEqual(build.metadata_build_options, "")
                 else:
                     self.assertEqual(build.name, f"{build.triple}:{build.build_option}")
-                    self.assertEqual(build.artifact_infix, f"{build.triple}-{build.build_option}")
+                    self.assertEqual(
+                        build.artifact_infix, f"{build.triple}-{build.build_option}"
+                    )
                     self.assertEqual(build.metadata_build_options, build.build_option)
 
     def test_build_options_matches_the_artifact_name_segment(self) -> None:

@@ -79,7 +79,9 @@ def _literal_build_time_vars(text: str) -> dict[str, Any]:
                 isinstance(key, str) and isinstance(value, str | int)
                 for key, value in values.items()
             ):
-                raise RuntimeError("sysconfig mapping holds values uv's parser cannot represent")
+                raise RuntimeError(
+                    "sysconfig mapping holds values uv's parser cannot represent"
+                )
             return dict(values)
     raise RuntimeError("literal build_time_vars mapping missing")
 
@@ -176,7 +178,9 @@ def _render_literal(values: dict[str, Any]) -> str:
     for key in sorted(values):
         value = values[key]
         if not isinstance(key, str) or not isinstance(value, str | int):
-            raise RuntimeError(f"unsupported sysconfig value: {key}={type(value).__name__}")
+            raise RuntimeError(
+                f"unsupported sysconfig value: {key}={type(value).__name__}"
+            )
         rows.append(f"    {key!r}: {value!r},")
     rows.append("}")
     return "\n".join(rows) + "\n"
@@ -197,7 +201,8 @@ def _overlay_sysconfigdata(path: Path, layout: Layout) -> dict[str, Any]:
 
     after_vars = _execute_sysconfigdata(path)
     preserved = {
-        key: before_vars.get(key) == after_vars.get(key) for key in PRESERVED_PRODUCER_KEYS
+        key: before_vars.get(key) == after_vars.get(key)
+        for key in PRESERVED_PRODUCER_KEYS
     }
     if not all(preserved.values()):
         changed = sorted(key for key, ok in preserved.items() if not ok)
@@ -260,14 +265,18 @@ def _patch_makefile(path: Path, layout: Layout) -> dict[str, Any]:
             continue
         key = match.group(1)
         if key == "prefix":
-            output.append("prefix := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../..)")
+            output.append(
+                "prefix := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../..)"
+            )
             seen.add(key)
         elif key in overrides:
             output.append(f"{key}=\t\t{overrides[key]}")
             seen.add(key)
         else:
             output.append(line)
-    output.extend(f"{key}=\t\t{value}" for key, value in overrides.items() if key not in seen)
+    output.extend(
+        f"{key}=\t\t{value}" for key, value in overrides.items() if key not in seen
+    )
     path.write_text("\n".join(output) + "\n", encoding="utf-8")
     return {
         "path": path.name,
@@ -363,7 +372,9 @@ HOST_DISCOVERED_VARS = {
 }
 
 
-def drop_host_discovered_values(sysdata: Path, sysvars: Path, makefile: Path) -> dict[str, Any]:
+def drop_host_discovered_values(
+    sysdata: Path, sysvars: Path, makefile: Path
+) -> dict[str, Any]:
     """Remove the values configure and the build interpreter took from this machine.
 
     ``MKDIR_P`` is whichever ``mkdir`` came first on the build machine's PATH, and
@@ -377,7 +388,9 @@ def drop_host_discovered_values(sysdata: Path, sysvars: Path, makefile: Path) ->
     """
     return {
         sysvars.name: _patch_sysconfig_vars_json(sysvars)["dropped_keys"],
-        makefile.name: _drop_assignments(makefile, r"^{key}[ \t]*=[ \t]*(?P<value>.*)$"),
+        makefile.name: _drop_assignments(
+            makefile, r"^{key}[ \t]*=[ \t]*(?P<value>.*)$"
+        ),
         sysdata.name: _drop_assignments(sysdata, r"'{key}': '(?P<value>[^']*)'"),
     }
 
@@ -408,7 +421,9 @@ def _patch_sysconfig_vars_json(path: Path) -> dict[str, Any]:
     before = path.read_bytes()
     payload = json.loads(before)
     if _dump_sysconfig_vars(payload) != before:
-        raise RuntimeError(f"unexpected serialisation of {path.name}; cannot patch it in place")
+        raise RuntimeError(
+            f"unexpected serialisation of {path.name}; cannot patch it in place"
+        )
 
     values = payload.get("build_time_vars", payload)
     dropped = {
@@ -431,14 +446,18 @@ def _dump_sysconfig_vars(payload: Any) -> bytes:
     return json.dumps(payload, indent=2).encode()
 
 
-def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -> dict[str, Any]:
+def apply_consumer_overlay(
+    install: Path, *, python_mm: str, host_triple: str
+) -> dict[str, Any]:
     """Overlay consumer metadata on an install prefix, in place."""
     layout = Layout(python_mm, host_triple)
     stdlib = install / layout.stdlib
     sysdata_candidates = sorted(stdlib.glob("_sysconfigdata_*.py"))
     sysvars_candidates = sorted(stdlib.glob("_sysconfig_vars_*.json"))
     if len(sysdata_candidates) != 1 or len(sysvars_candidates) != 1:
-        raise RuntimeError("expected exactly one sysconfigdata and one sysconfig vars file")
+        raise RuntimeError(
+            "expected exactly one sysconfigdata and one sysconfig vars file"
+        )
     sysdata, sysvars = sysdata_candidates[0], sysvars_candidates[0]
     config_dir = install / layout.config_dir
     makefile = config_dir / "Makefile"
@@ -463,7 +482,9 @@ def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -
     entry = install / f"bin/python{python_mm}-config"
     entry.parent.mkdir(parents=True, exist_ok=True)
     entry.write_text(
-        relative_shell_wrapper(python_mm, f'"$_bindir/../{layout.config_dir}/python-config.py"'),
+        relative_shell_wrapper(
+            python_mm, f'"$_bindir/../{layout.config_dir}/python-config.py"'
+        ),
         encoding="utf-8",
     )
     os.chmod(entry, 0o755)
@@ -486,16 +507,24 @@ def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -
     if effective.get("ANDROID_METADATA_PROFILE") != PROFILE:
         raise RuntimeError("consumer overlay did not become effective")
 
-    for path in [entry, *(install / "lib/pkgconfig" / row["path"] for row in pkgconfig_rows)]:
+    for path in [
+        entry,
+        *(install / "lib/pkgconfig" / row["path"] for row in pkgconfig_rows),
+    ]:
         text = path.read_text(encoding="utf-8")
         if any(root in text for root in PRODUCER_ROOTS):
-            raise RuntimeError(f"consumer surface still carries a producer path: {path}")
+            raise RuntimeError(
+                f"consumer surface still carries a producer path: {path}"
+            )
 
     return {
         "schema_version": 1,
         "profile": PROFILE,
         "producer_provenance_preserved": True,
-        "sysconfigdata": {"path": sysdata.relative_to(install).as_posix(), **sysdata_row},
+        "sysconfigdata": {
+            "path": sysdata.relative_to(install).as_posix(),
+            **sysdata_row,
+        },
         "host_discovered_values_dropped": host_discovered,
         "sysconfig_vars_json": {
             "path": sysvars.relative_to(install).as_posix(),
@@ -516,9 +545,14 @@ def apply_consumer_overlay(install: Path, *, python_mm: str, host_triple: str) -
                 key: "<install>/" + value.relative_to(install).as_posix()
                 for key, value in expected_paths.items()
             },
-            **{key: effective.get(key) for key in ("CC", "CXX", "AR", "CFLAGS", "LDFLAGS")},
+            **{
+                key: effective.get(key)
+                for key in ("CC", "CXX", "AR", "CFLAGS", "LDFLAGS")
+            },
         },
-        "preserved_producer": {key: effective.get(key) for key in PRESERVED_PRODUCER_KEYS},
+        "preserved_producer": {
+            key: effective.get(key) for key in PRESERVED_PRODUCER_KEYS
+        },
     }
 
 

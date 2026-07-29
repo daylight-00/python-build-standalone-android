@@ -18,14 +18,18 @@ import sys
 
 def run_command(command: list[str]) -> int:
     print("$ " + " ".join(command), flush=True)
-    returncode = subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr).returncode
+    returncode = subprocess.run(
+        command, stdout=sys.stdout, stderr=sys.stderr
+    ).returncode
     print()
     return returncode
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check code.")
-    parser.add_argument("--fix", action="store_true", help="apply the fixes ruff can apply")
+    parser.add_argument(
+        "--fix", action="store_true", help="apply the fixes ruff can apply"
+    )
     args = parser.parse_args(argv)
 
     check_args = ["--fix"] if args.fix else []
@@ -37,7 +41,9 @@ def main(argv: list[str] | None = None) -> int:
         + run_command(["mypy"])
         # `-t .` so the repository root, not tests/, is the import root and the
         # tests can import pythonbuild.
-        + run_command([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-t", "."])
+        + run_command(
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-t", "."]
+        )
     )
 
     if failures:

@@ -36,7 +36,9 @@ def build_receipt(build_option: str, api_level: int) -> dict[str, Any]:
                 "artifact": artifact(f"cpython-3.14.6+20260729-{infix}-full.tar.zst"),
             },
             "install_only": {"artifact": artifact(f"...-{infix}-install_only.tar.gz")},
-            "install_only_stripped": {"artifact": artifact(f"...-{infix}-stripped.tar.gz")},
+            "install_only_stripped": {
+                "artifact": artifact(f"...-{infix}-stripped.tar.gz")
+            },
         },
     }
 
@@ -45,26 +47,34 @@ RECEIPTS = [build_receipt("upstream", 24), build_receipt("default", 34)]
 
 
 def render(previous_levels: dict[str, int] | None) -> str:
-    with mock.patch.object(notes, "shipped_api_levels", return_value=previous_levels or {}):
+    with mock.patch.object(
+        notes, "shipped_api_levels", return_value=previous_levels or {}
+    ):
         # str(): the module was loaded by path, so its annotations are not visible.
         return str(notes.render(RECEIPTS, "20260729", REPOSITORY, "20260728"))
 
 
 class ReleaseNotesTest(unittest.TestCase):
     def test_unchanged_floors_produce_no_callout(self) -> None:
-        text = render({"aarch64-linux-android": 34, "aarch64-linux-android-upstream": 24})
+        text = render(
+            {"aarch64-linux-android": 34, "aarch64-linux-android-upstream": 24}
+        )
         self.assertNotIn("[!IMPORTANT]", text)
         self.assertTrue(text.startswith("## Builds"))
 
     def test_a_moved_floor_is_called_out_above_everything(self) -> None:
-        text = render({"aarch64-linux-android": 33, "aarch64-linux-android-upstream": 21})
+        text = render(
+            {"aarch64-linux-android": 33, "aarch64-linux-android-upstream": 21}
+        )
         self.assertTrue(text.startswith("> [!IMPORTANT]"))
         self.assertIn("changed since `20260728`", text)
         self.assertIn("the flagship build moved from API 33 to API 34", text)
         self.assertIn("the `upstream` build moved from API 21 to API 24", text)
 
     def test_only_the_build_that_moved_is_named(self) -> None:
-        text = render({"aarch64-linux-android": 34, "aarch64-linux-android-upstream": 21})
+        text = render(
+            {"aarch64-linux-android": 34, "aarch64-linux-android-upstream": 21}
+        )
         self.assertIn("the `upstream` build moved", text)
         self.assertNotIn("the flagship build moved", text)
 

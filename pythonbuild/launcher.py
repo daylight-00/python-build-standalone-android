@@ -44,7 +44,9 @@ def build_launcher(
     library = prefix / f"lib/libpython{python_mm}.so"
     for required in (header, library):
         if not required.is_file():
-            raise RuntimeError(f"upstream prefix is missing {required.name}: {required}")
+            raise RuntimeError(
+                f"upstream prefix is missing {required.name}: {required}"
+            )
 
     output.parent.mkdir(parents=True, exist_ok=True)
     command = [
@@ -85,7 +87,9 @@ def build_launcher(
 
     surface = elf_surface(output, str(toolchain.readelf))
     if surface["runpath"] != [RUNPATH]:
-        raise RuntimeError(f"launcher RUNPATH is {surface['runpath']}, expected [{RUNPATH}]")
+        raise RuntimeError(
+            f"launcher RUNPATH is {surface['runpath']}, expected [{RUNPATH}]"
+        )
     if not surface["load_alignments"] or any(
         value != PAGE_SIZE for value in surface["load_alignments"]
     ):

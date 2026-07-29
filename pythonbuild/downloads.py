@@ -39,7 +39,9 @@ def _fetch(url: str, destination: Path) -> None:
     partial.replace(destination)
 
 
-def acquire(spec: dict[str, Any], cache: Path = DEFAULT_CACHE, *, what: str = "input") -> Path:
+def acquire(
+    spec: dict[str, Any], cache: Path = DEFAULT_CACHE, *, what: str = "input"
+) -> Path:
     """Return a cached copy of ``spec``, downloading it if needed.
 
     ``spec`` is a lock entry with ``filename``, ``url``, ``size_bytes``, and
@@ -89,7 +91,9 @@ def host_entry(section: dict[str, Any], what: str) -> dict[str, Any]:
     tag = host_tag()
     if tag not in hosts:
         known = ", ".join(sorted(hosts))
-        raise RuntimeError(f"{what} is not pinned for host {tag}; pinned hosts: {known}")
+        raise RuntimeError(
+            f"{what} is not pinned for host {tag}; pinned hosts: {known}"
+        )
     entry: dict[str, Any] = hosts[tag]
     return entry
 

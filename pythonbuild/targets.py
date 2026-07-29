@@ -83,7 +83,9 @@ class Build:
         return root / self.input_lock
 
 
-def _build(triple: str, triple_entry: dict[str, Any], option: str, entry: dict[str, Any]) -> Build:
+def _build(
+    triple: str, triple_entry: dict[str, Any], option: str, entry: dict[str, Any]
+) -> Build:
     api = entry["android_api"]
     return Build(
         triple=triple,

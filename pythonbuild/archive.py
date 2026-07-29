@@ -162,7 +162,8 @@ def tree_manifest(root: Path, *, exclude: Iterable[str] = ()) -> list[dict[str, 
     excluded = set(exclude)
     rows: list[dict[str, Any]] = []
     entries = sorted(
-        [root, *root.rglob("*")], key=lambda item: item.relative_to(root.parent).as_posix()
+        [root, *root.rglob("*")],
+        key=lambda item: item.relative_to(root.parent).as_posix(),
     )
     for path in entries:
         rel = path.relative_to(root.parent).as_posix()

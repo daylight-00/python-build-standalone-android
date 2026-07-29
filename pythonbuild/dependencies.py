@@ -114,7 +114,9 @@ def file_prefix_map_override(host_paths: tuple[tuple[str, str], ...]) -> Overrid
     CFLAGS rather than appending to it, so the flags have to go in there rather
     than being passed through.
     """
-    flags = " ".join(f"-ffile-prefix-map={path}={placeholder}" for path, placeholder in host_paths)
+    flags = " ".join(
+        f"-ffile-prefix-map={path}={placeholder}" for path, placeholder in host_paths
+    )
     return Override(
         path="android-env.sh",
         pattern=r'^export CFLAGS="-D__BIONIC_NO_PAGE_SIZE_MACRO"$',
@@ -156,7 +158,9 @@ unset _tool""",
     )
 
 
-def relocate_pkgconfig(prefix: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def relocate_pkgconfig(
+    prefix: Path, rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """Make each ``.pc`` file describe the prefix it is in.
 
     A component writes the directory it was configured in, and not only into
@@ -173,7 +177,11 @@ def relocate_pkgconfig(prefix: Path, rows: list[dict[str, Any]]) -> list[dict[st
     updated: list[dict[str, Any]] = []
     for row in rows:
         path = prefix / row["path"]
-        if row["type"] != "file" or not row["path"].endswith(".pc") or path.is_symlink():
+        if (
+            row["type"] != "file"
+            or not row["path"].endswith(".pc")
+            or path.is_symlink()
+        ):
             updated.append(row)
             continue
         text = path.read_text(encoding="utf-8")
@@ -182,11 +190,15 @@ def relocate_pkgconfig(prefix: Path, rows: list[dict[str, Any]]) -> list[dict[st
             updated.append(row)
             continue
         path.write_text(rewritten, encoding="utf-8")
-        updated.append({**row, "size": path.stat().st_size, "sha256": sha256_path(path)})
+        updated.append(
+            {**row, "size": path.stat().st_size, "sha256": sha256_path(path)}
+        )
     return updated
 
 
-def drop_libtool_archives(prefix: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def drop_libtool_archives(
+    prefix: Path, rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """Remove libtool's bookkeeping from the merged prefix.
 
     A ``.la`` file records the absolute directory its library was installed to,
@@ -205,7 +217,12 @@ def drop_libtool_archives(prefix: Path, rows: list[dict[str, Any]]) -> list[dict
 
 def _relocate_pc(text: str) -> str:
     recorded = next(
-        (line[len("prefix=") :] for line in text.splitlines() if line.startswith("prefix=")), ""
+        (
+            line[len("prefix=") :]
+            for line in text.splitlines()
+            if line.startswith("prefix=")
+        ),
+        "",
     )
     if recorded.startswith("/"):
         text = text.replace(recorded, "${prefix}")
@@ -226,9 +243,13 @@ def _acquire_recipes(repository: str, commit: str, destination: Path) -> str:
             "cloning the recipe repository",
         )
     _reset(destination)
-    run_checked(["git", "-C", str(destination), "checkout", "-q", commit], f"checking out {commit}")
+    run_checked(
+        ["git", "-C", str(destination), "checkout", "-q", commit],
+        f"checking out {commit}",
+    )
     return run_checked(
-        ["git", "-C", str(destination), "rev-parse", "HEAD"], "reading the recipe commit"
+        ["git", "-C", str(destination), "rev-parse", "HEAD"],
+        "reading the recipe commit",
     ).stdout.strip()
 
 
@@ -255,7 +276,9 @@ def resolved_compiler(repo: Path, host: str, environment: dict[str, str]) -> str
 
 def content_digest(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """A digest over what an archive contained, independent of how it was packed."""
-    files = sorted((row["path"], row["sha256"]) for row in rows if row["type"] == "file")
+    files = sorted(
+        (row["path"], row["sha256"]) for row in rows if row["type"] == "file"
+    )
     digest = hashlib.sha256()
     for path, sha256 in files:
         digest.update(f"{path}\0{sha256}\0".encode())
@@ -278,7 +301,9 @@ def build_dependencies(
     """Build every dependency from source and merge them into one prefix."""
     lock = read_json_object(lock_path)
     repo = workspace / "recipes"
-    commit = _acquire_recipes(lock["recipes"]["repository"], lock["recipes"]["commit"], repo)
+    commit = _acquire_recipes(
+        lock["recipes"]["repository"], lock["recipes"]["commit"], repo
+    )
 
     # From scratch every time. The workspace persists between runs so the clone
     # and the downloads are reused, but a prefix left behind would merge with
@@ -290,14 +315,18 @@ def build_dependencies(
     environment = dict(os.environ)
     environment["ANDROID_API_LEVEL"] = str(android_api)
     environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
-    environment["PATH"] = os.pathsep.join([str(pkg_config_bin), environment.get("PATH", "")])
+    environment["PATH"] = os.pathsep.join(
+        [str(pkg_config_bin), environment.get("PATH", "")]
+    )
     # A search path inherited from the host would decide which .pc file is read.
     environment.pop("PKG_CONFIG_PATH", None)
 
     # One recipe revision, so every component is built the same way. The
     # overrides are not identical for every component: OpenSSL needs one the
     # others do not.
-    openssldir = next((c["openssldir"] for c in lock["components"] if c.get("openssldir")), None)
+    openssldir = next(
+        (c["openssldir"] for c in lock["components"] if c.get("openssldir")), None
+    )
     prefix_map = file_prefix_map_override(host_paths)
 
     def overrides_for(name: str) -> list[Override]:
@@ -355,7 +384,9 @@ def build_dependencies(
             env=environment,
         )
 
-        produced = download_dir / host / f"{name}-{version}-{component['build']}-{host}.tar.gz"
+        produced = (
+            download_dir / host / f"{name}-{version}-{component['build']}-{host}.tar.gz"
+        )
         if not produced.is_file():
             raise RuntimeError(f"{name} recipe did not produce {produced}")
         rows = relocate_pkgconfig(prefix, safe_extract_tar(produced, prefix))
@@ -387,11 +418,15 @@ def build_dependencies(
         "source_date_epoch": source_date_epoch,
         "host": host,
         "components": records,
-        "objects": verify_dependency_prefix(prefix, android_api=android_api, readelf=readelf),
+        "objects": verify_dependency_prefix(
+            prefix, android_api=android_api, readelf=readelf
+        ),
     }
 
 
-def verify_dependency_prefix(prefix: Path, *, android_api: int, readelf: str) -> dict[str, Any]:
+def verify_dependency_prefix(
+    prefix: Path, *, android_api: int, readelf: str
+) -> dict[str, Any]:
     """Every object must report the API level the build claims to target.
 
     The note comes from the binary rather than from the build that produced it,
@@ -427,5 +462,7 @@ def verify_dependency_prefix(prefix: Path, *, android_api: int, readelf: str) ->
         "ndk_version": sample.get("ndk_version"),
         "ndk_build_number": sample.get("ndk_build_number"),
         "unstamped": unstamped,
-        "sha256": {path.relative_to(prefix).as_posix(): sha256_path(path) for path in objects},
+        "sha256": {
+            path.relative_to(prefix).as_posix(): sha256_path(path) for path in objects
+        },
     }

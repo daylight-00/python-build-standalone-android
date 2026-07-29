@@ -69,7 +69,8 @@ def _resolve(receipt: dict[str, Any], builds: dict[str, Build]) -> Build:
 def _floor_callout(previous: str, moved: list[tuple[str, int, int]]) -> list[str]:
     """A floor that moved without anyone deciding to move it has to be unmissable."""
     detail = "; ".join(
-        f"{label} moved from API {before} to API {after}" for label, before, after in moved
+        f"{label} moved from API {before} to API {after}"
+        for label, before, after in moved
     )
     return [
         "> [!IMPORTANT]",
@@ -154,7 +155,11 @@ def render(
     lines.append("## Installing with uv")
     lines.append("")
     for receipt, build in pairs:
-        label = "the flagship" if build.build_option == DEFAULT_BUILD_OPTION else "the baseline"
+        label = (
+            "the flagship"
+            if build.build_option == DEFAULT_BUILD_OPTION
+            else "the baseline"
+        )
         lines.append(f"`{build.name}`, {label}:")
         lines.append("")
         lines.append(
@@ -176,7 +181,9 @@ def render(
         for flavor in ("full", "install_only", CATALOG_FLAVOR):
             artifact = receipt["flavors"][flavor]["artifact"]
             size = f"{artifact['size_bytes'] / 1_048_576:.1f} MiB"
-            lines.append(f"| `{artifact['filename']}` | {size} | `{artifact['sha256']}` |")
+            lines.append(
+                f"| `{artifact['filename']}` | {size} | `{artifact['sha256']}` |"
+            )
     lines.append("")
 
     lines.append("## Verification")
@@ -198,7 +205,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     paths = sorted(args.dist_dir.rglob(f"*+{args.tag}-*.build.json"))
     if not paths:
-        print(f"no build receipts for {args.tag} under {args.dist_dir}", file=sys.stderr)
+        print(
+            f"no build receipts for {args.tag} under {args.dist_dir}", file=sys.stderr
+        )
         return 2
     receipts = [read_json_object(path) for path in paths]
 

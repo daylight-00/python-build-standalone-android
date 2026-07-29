@@ -32,8 +32,12 @@ def make_build(
         ndk="27.3.13750724",
         producer="cpython-source" if build_option == "default" else "upstream-prebuilt",
         input_lock="config/source/cpython-3.14.6.lock.json",
-        android_api=AndroidApi(level=api_level, policy="a-stated-rule", rationale="because"),
-        runtime_data={"mechanism": "build-default"} if runtime_data is None else runtime_data,
+        android_api=AndroidApi(
+            level=api_level, policy="a-stated-rule", rationale="because"
+        ),
+        runtime_data={"mechanism": "build-default"}
+        if runtime_data is None
+        else runtime_data,
         uv_catalog="download-metadata.json",
         python_versions=("3.14",),
     )
@@ -46,7 +50,9 @@ def load_script(name: str) -> ModuleType:
     ordinary way. Upstream has the same shape of script and does not test them;
     here the floor callout is worth holding onto, so it is loaded by path.
     """
-    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), ROOT / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(
+        name.replace("-", "_"), ROOT / f"{name}.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

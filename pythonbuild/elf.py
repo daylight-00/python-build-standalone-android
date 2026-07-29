@@ -47,7 +47,9 @@ def resolve_tool(tool: str) -> Path:
     """
     candidate = Path(tool).expanduser()
     if candidate.is_absolute() or candidate.parent != Path("."):
-        invocation = (candidate if candidate.is_absolute() else Path.cwd() / candidate).absolute()
+        invocation = (
+            candidate if candidate.is_absolute() else Path.cwd() / candidate
+        ).absolute()
         if not invocation.is_file():
             raise FileNotFoundError(f"tool not found: {tool}")
         return invocation
@@ -73,7 +75,9 @@ def elf_surface(path: Path, readelf: str = "readelf") -> dict[str, Any]:
             kind = stripped.split(":", 1)[1].strip()
         elif stripped.startswith("Machine:"):
             machine = stripped.split(":", 1)[1].strip()
-    tags: dict[str, list[str]] = {key: [] for key in ("NEEDED", "SONAME", "RPATH", "RUNPATH")}
+    tags: dict[str, list[str]] = {
+        key: [] for key in ("NEEDED", "SONAME", "RPATH", "RUNPATH")
+    }
     for line in dynamic.stdout.splitlines():
         match = DYNAMIC_RE.search(line)
         if match:
@@ -132,12 +136,21 @@ def set_relative_runpaths(
         rel = path.relative_to(install).as_posix()
         before = elf_surface(path, readelf)
         expected = relative_runpath(path, libdir)
-        command = [patchelf, "--page-size", str(PAGE_SIZE), "--set-rpath", expected, str(path)]
+        command = [
+            patchelf,
+            "--page-size",
+            str(PAGE_SIZE),
+            "--set-rpath",
+            expected,
+            str(path),
+        ]
         mutation = run(command)
         if mutation.returncode:
             raise RuntimeError(f"patchelf failed for {rel}: {mutation.stderr.strip()}")
         after = elf_surface(path, readelf)
-        alignment = alignment_policy(before["load_alignments"], after["load_alignments"])
+        alignment = alignment_policy(
+            before["load_alignments"], after["load_alignments"]
+        )
         exact = (
             before["type"] == after["type"]
             and before["machine"] == after["machine"]
@@ -173,7 +186,9 @@ def android_note(path: Path, readelf: str = "readelf") -> dict[str, Any] | None:
     """
     result = run([readelf, "--notes", str(path)])
     if result.returncode:
-        raise RuntimeError(f"readelf could not read notes from {path}: {result.stderr.strip()}")
+        raise RuntimeError(
+            f"readelf could not read notes from {path}: {result.stderr.strip()}"
+        )
     if "NT_ANDROID_TYPE_IDENT" not in result.stdout:
         return None
 
@@ -200,7 +215,9 @@ def section_names(path: Path, readelf: str = "readelf") -> list[str]:
     readelf_path = resolve_tool(readelf)
     result = run([str(readelf_path), "-SW", str(path)])
     if result.returncode:
-        raise RuntimeError(f"readelf section census failed for {path}: {result.stderr.strip()}")
+        raise RuntimeError(
+            f"readelf section census failed for {path}: {result.stderr.strip()}"
+        )
     names: list[str] = []
     for line in result.stdout.splitlines():
         stripped = line.lstrip()
@@ -246,7 +263,11 @@ def tool_identity(tool: str) -> dict[str, Any]:
 
 
 def strip_object(
-    path: Path, *, strip_tool: str, readelf: str = "readelf", display_path: str | None = None
+    path: Path,
+    *,
+    strip_tool: str,
+    readelf: str = "readelf",
+    display_path: str | None = None,
 ) -> dict[str, Any]:
     """Strip one object, recording its full before/after identity."""
     strip_path = resolve_tool(strip_tool)
@@ -261,7 +282,15 @@ def strip_object(
     after_sections = section_census(path, readelf)
     preserved = all(
         before_surface[key] == after_surface[key]
-        for key in ("type", "machine", "needed", "soname", "rpath", "runpath", "load_alignments")
+        for key in (
+            "type",
+            "machine",
+            "needed",
+            "soname",
+            "rpath",
+            "runpath",
+            "load_alignments",
+        )
     )
     if not preserved:
         raise RuntimeError(f"strip changed the dynamic or alignment surface: {path}")
