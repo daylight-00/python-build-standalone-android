@@ -2,12 +2,18 @@
 
 ## Status
 
-**No release has been published from this repository yet, and no artifact built
-here has been qualified on a device.** The scope below is what the release
-process is being built to support and to check. Until a release carries a device
-qualification receipt, treat it as intent rather than a claim.
+Two releases are published. `20260729` is current and carries both builds;
+`20260728` carries `upstream` alone. The earlier one is superseded and left in
+place — a published name has to keep serving the bytes it was published with,
+because the uv catalog pins them by hash.
 
-The predecessor research repository qualified an equivalent artifact on real
+Publishing is gated on a device qualification receipt covering every artifact in
+the release by SHA-256, and the receipts are committed under
+`qualification/<tag>/<build>.json`. A receipt is evidence only for the bytes it
+names, so what follows describes the artifacts a release actually shipped rather
+than the project in general.
+
+The predecessor research repository qualified equivalent artifacts on real
 hardware, but those receipts are bound to bytes produced by a different
 toolchain on a different host. They do not carry over.
 
@@ -19,6 +25,10 @@ One triple, `aarch64-linux-android`, `arm64-v8a` only.
 | --- | --- | --- |
 | `upstream` | 7.0 (API 24) | inherited from the official Python.org package |
 | *(none)* | 14 (API 34) | the last API level that changes the CPython build |
+
+The `extended` build that the [README](../README.md) and
+[`design.md`](design.md) describe is planned and unpublished. Nothing here
+covers it, and this table gains a row when it ships.
 
 `upstream` is a permanent baseline, not a stepping stone. It exists so there is
 always a build whose device coverage is upstream's responsibility rather than
