@@ -64,22 +64,44 @@ upstream    whatever floor the official package was built with
 default     the last API level whose Bionic additions change the CPython build
 ```
 
-For `default` the rule resolves by checking [Bionic's per-API function
-lists][bionic-status] against `AC_CHECK_FUNCS` in the pinned CPython source:
+For `default` the rule is measured rather than reasoned about, by
+`./resolve-api-level.py`: CPython is configured at candidate levels and the
+`pyconfig.h` each produces is compared, and the answer is the lowest level whose
+decisions already match the highest level the pinned NDK can compile for.
 
-| API | Bionic adds | Detected by CPython `configure` |
+| API | Bionic adds | Reaches the build |
 | --- | --- | --- |
-| 34 | `close_range`, `copy_file_range`, `memset_explicit`, `__freadahead`, `posix_spawn_file_actions_add{,f}chdir_np` | **`close_range`, `copy_file_range`** |
-| 35 | `tcgetwinsize`, `tcsetwinsize`, `_Fork`, crash-detail and time zone functions | none |
-| 36 | `qsort_r`, `sig2str`/`str2sig`, `lchmod`, pthread affinity functions, `mseal` | none — `lchmod` is checked, but only under `if test "$MACHDEP" != linux`, which excludes Android |
+| 34 | `close_range`, `copy_file_range`, `memset_explicit`, `__freadahead`, `posix_spawn_file_actions_add{,f}chdir_np` | **`HAVE_CLOSE_RANGE`, `HAVE_COPY_FILE_RANGE`** |
+| 35 | `tcgetwinsize`, `tcsetwinsize`, `_Fork`, crash-detail and time zone functions | nothing |
+| 36 | `qsort_r`, `sig2str`/`str2sig`, `lchmod`, pthread affinity functions, `mseal` | `lchmod` would, but the pinned NDK compiles no higher than 35 |
 
-Above API 34 the build makes identical decisions, so raising the level would
-only cost device coverage. Of the two functions, `close_range` carries the
-runtime weight: `_posixsubprocess` uses it to close inherited descriptors before
-`exec` instead of walking `/proc/self/fd`.
+Measured against CPython 3.14.6 and NDK r27d:
 
-API 34 also stays inside the stable NDK the official CPython Android release
-already pins, which compiles up to API 35.
+```
+measured floor       API 34
+NDK compiles up to   API 35
+levels configured    28, 32, 33, 34, 35
+evidence             API 33 -> 34 changes HAVE_CLOSE_RANGE, HAVE_COPY_FILE_RANGE
+```
+
+So the answer today is 34, and `close_range` carries the runtime weight of it:
+`_posixsubprocess` uses it to close inherited descriptors before `exec` instead
+of walking `/proc/self/fd`.
+
+Note what the API 36 row does *not* say. An earlier version of this document
+recorded that `lchmod` is checked only under `if test "$MACHDEP" != linux`,
+"which excludes Android". It does not: `MACHDEP` is `android`, the probe runs,
+and it comes back negative only because Bionic introduced `lchmod` at 36 and the
+NDK cannot target that yet. The floor is 34 because of the NDK ceiling, not
+because nothing above 34 would register. An NDK that compiles for 36 would move
+it — which is the whole reason the number is measured now instead of argued.
+
+Reading `AC_CHECK_FUNCS` and looking each name up in Bionic's [per-API
+lists][bionic-status] is the obvious cheaper method and is the one that produced
+that error: knowing which probes actually run means interpreting configure's
+shell conditionals. Comparing generated `pyconfig.h` files needs no such
+judgement, and covers every kind of decision configure makes rather than
+function probes alone.
 
 ### Why the triple has no API level
 

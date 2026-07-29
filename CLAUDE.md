@@ -82,6 +82,7 @@ $ ./generate-catalog.py --target <…> --tag <…>             # uv download met
 $ python3 qualify.py <archive> --expected-api <n>          # on a device, stdlib only
 $ ./check.py [--fix]                                       # lint, types, tests
 $ ./ci-matrix.py                                           # the CI build matrix
+$ ./resolve-api-level.py [--check]                         # measure the flagship API floor
 ```
 
 `just` recipes wrap these; `just --list` shows them. Releases are manual,

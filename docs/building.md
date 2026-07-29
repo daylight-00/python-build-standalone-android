@@ -82,6 +82,22 @@ $ ./check.py --fix    # apply what ruff can apply
 `ruff.toml` and `mypy.ini` decide what is checked, so no command line has to be
 kept in step with them.
 
+## The flagship's API floor
+
+`ci-targets.yaml` declares it, and the rule it declares is measured rather than
+argued:
+
+```console
+$ ./resolve-api-level.py            # report what the rule selects
+$ ./resolve-api-level.py --check    # fail if the declaration has gone stale
+```
+
+It configures CPython at candidate levels and compares the generated
+`pyconfig.h`, so it needs the NDK and a build interpreter and takes tens of
+minutes. It is not part of a build — see
+[the API policy](technotes.md#the-android-api-policy) — and CI runs it when the
+CPython or NDK pin changes, and weekly.
+
 ## Releasing
 
 Releases are manual and gated: `workflow_dispatch` with an explicit tag and
