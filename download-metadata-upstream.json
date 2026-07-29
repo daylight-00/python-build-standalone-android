@@ -4,7 +4,7 @@
       "family": "aarch64",
       "variant": null
     },
-    "build": "20260728",
+    "build": "20260729",
     "libc": "none",
     "major": 3,
     "minor": 14,
@@ -12,8 +12,8 @@
     "os": "linux",
     "patch": 6,
     "prerelease": "",
-    "sha256": "9faac4c0dd96de3af4a492179d1b95f973d78816cc22e8ccce5ac65718c8cf90",
-    "url": "https://github.com/daylight-00/python-build-standalone-android/releases/download/20260728/cpython-3.14.6%2B20260728-aarch64-linux-android-upstream-install_only_stripped.tar.gz",
+    "sha256": "67e71fa07dcd364c7942694247eb8c1a54757f7fe7f1b2edae8608f0a5cc6580",
+    "url": "https://github.com/daylight-00/python-build-standalone-android/releases/download/20260729/cpython-3.14.6%2B20260729-aarch64-linux-android-upstream-install_only_stripped.tar.gz",
     "variant": null
   }
 }
