@@ -206,8 +206,12 @@ jobs:
       - name: Determine whether this release is device-qualified
         id: channel
         run: |
-          waived=$(grep -rl '"device_qualified": false' incoming --include='*.qualification.json' | wc -l)
+          # Parsed rather than pattern-matched. Grepping for `"device_qualified":
+          # false` depended on how json.dumps happened to space and indent it, and
+          # this is the one decision in the release that must not fail open.
           total=$(find incoming -name '*.qualification.json' | wc -l)
+          waived=$(find incoming -name '*.qualification.json' -print0 \
+            | xargs -0 -r jq -r 'select(.device_qualified != true) | .build' | wc -l)
           if [ "$total" -eq 0 ]; then
             echo "no qualification verdicts were recorded" >&2
             exit 1

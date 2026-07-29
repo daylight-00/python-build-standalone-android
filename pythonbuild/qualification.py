@@ -108,7 +108,7 @@ def verify(
     if not path.is_file():
         raise QualificationError(
             f"no device qualification receipt for {build.name} at {tag}.\n"
-            f"Run qualify.py on a device and commit the result to {path}."
+            f"Run qualify.py on a device and commit the result to {_display_path(path)}."
         )
     receipt = read_json_object(path)
 
