@@ -24,16 +24,21 @@ check-qualification target tag:
 release-notes tag:
   uv run ./release-notes.py --tag {{tag}}
 
-# Lint, format check, and typecheck.
+# Lint, format check, typecheck, and run the tests.
 check:
-  uv run ruff check .
-  uv run ruff format --check .
-  uv run mypy pythonbuild build.py generate-catalog.py check-qualification.py release-notes.py qualify.py
+  uv run ./check.py
 
-# Apply every automatic fix.
+# Apply every automatic fix, then report what is left.
 fmt:
-  uv run ruff check --fix .
-  uv run ruff format .
+  uv run ./check.py --fix
+
+# Run the test suite alone.
+test *args:
+  uv run python -m unittest discover -s tests -t . {{args}}
+
+# Print the CI build matrix ci-targets.yaml implies.
+matrix:
+  uv run ./ci-matrix.py --pretty
 
 # Print PYTHON.json from a full archive.
 cat-python-json archive:

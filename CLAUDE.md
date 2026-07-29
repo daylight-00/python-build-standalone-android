@@ -42,8 +42,11 @@ These hold for every build. Breaking one is a bug even when tests pass.
   built before. This one has bitten three times.
 - **A qualification receipt is evidence only for the bytes it names.** It binds
   artifacts by SHA-256. Never widen a receipt to cover a build it did not run.
-- **Metadata is omitted rather than invented.** If a field would describe
-  something this project did not produce, leave it out.
+- **Metadata is never invented, and is omitted only where the format allows.**
+  A field describing something this project did not produce is left out when it
+  is optional and made empty when it is required — an empty list of object files
+  is a fact about the distribution, a plausible-looking path is not. Omitting a
+  required field is not honesty, it is a file upstream's own reader rejects.
 - **A build is held only to what it declares.** `ci-targets.yaml` says what a
   build compiles in; the gate requires exactly that and no more.
 
@@ -72,7 +75,8 @@ $ ./build.py --target <triple[:option]> --tag <YYYYMMDD>   # build one distribut
 $ ./check-qualification.py --target <…> --tag <…>          # does a receipt cover it
 $ ./generate-catalog.py --target <…> --tag <…>             # uv download metadata
 $ python3 qualify.py <archive> --expected-api <n>          # on a device, stdlib only
-$ uv run ruff check . && uv run ruff format . && uv run mypy pythonbuild
+$ ./check.py [--fix]                                       # lint, types, tests
+$ ./ci-matrix.py                                           # the CI build matrix
 ```
 
 `just` recipes wrap these; `just --list` shows them. Releases are manual,

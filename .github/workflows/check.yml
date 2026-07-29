@@ -30,37 +30,11 @@ jobs:
 
       - run: uv sync --group check
 
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run mypy pythonbuild build.py generate-catalog.py check-qualification.py release-notes.py qualify.py
-
-      # The assembler enforces this too, but failing here takes seconds rather
-      # than a full build.
-      - name: Validate the license manifest
-        run: |
-          uv run python -c "
-          from pathlib import Path
-          from pythonbuild.utils import read_json_object
-          root = Path('licenses')
-          declared = {c['file'] for c in read_json_object(root / 'components.json')['components'] if c.get('file')}
-          shipped = {p.name for p in root.glob('LICENSE.*.txt')}
-          assert declared == shipped, f'declared-only={sorted(declared - shipped)} shipped-only={sorted(shipped - declared)}'
-          print(f'{len(shipped)} component license texts, manifest agrees')
-          "
-
-      # The API level in ci-targets.yaml and the one in the input lock describe
-      # the same floor. If they ever disagree, one of them was edited alone.
-      - name: Validate the build table and input locks
-        run: |
-          uv run python -c "
-          from pythonbuild.targets import load_builds
-          from pythonbuild.utils import read_json_object
-          builds = load_builds()
-          assert builds, 'ci-targets.yaml declares no builds'
-          for name, build in sorted(builds.items()):
-              lock = read_json_object(build.input_lock_path())
-              print(f'{name}: {build.producer}, API {build.android_api.level}, NDK {build.ndk}')
-              assert lock['target']['android_api'] == build.android_api.level, name
-              assert lock['target']['triple'] == build.triple, name
-              assert lock['target']['build_option'] == build.build_option, name
-          "
+      # Lint, formatting, types, and the test suite. The tools take their scope
+      # from their own configuration, so this job names no paths — the list used
+      # to live here and in the Justfile, and the two could disagree.
+      #
+      # The license manifest and the build table were checked by Python embedded
+      # in this file, where nothing linted it and nobody could run it without
+      # pushing. Both are tests now.
+      - run: uv run ./check.py

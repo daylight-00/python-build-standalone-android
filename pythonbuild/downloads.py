@@ -45,7 +45,7 @@ def acquire(spec: dict[str, Any], cache: Path = DEFAULT_CACHE, *, what: str = "i
     ``spec`` is a lock entry with ``filename``, ``url``, ``size_bytes``, and
     either ``sha256`` or ``sha1``.
     """
-    path = cache / spec["filename"]
+    path = cache / str(spec["filename"])
     if path.exists():
         try:
             _verify(path, spec, what)
@@ -90,7 +90,8 @@ def host_entry(section: dict[str, Any], what: str) -> dict[str, Any]:
     if tag not in hosts:
         known = ", ".join(sorted(hosts))
         raise RuntimeError(f"{what} is not pinned for host {tag}; pinned hosts: {known}")
-    return hosts[tag]
+    entry: dict[str, Any] = hosts[tag]
+    return entry
 
 
 __all__ = [

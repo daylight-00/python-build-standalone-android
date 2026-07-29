@@ -131,7 +131,7 @@ def _llvm_bin(ndk: Path) -> Path:
 
 def resolve_patchelf(lock: dict[str, Any], cache: Path = DEFAULT_CACHE) -> Path:
     section = lock["patchelf"]
-    installed = cache / f"patchelf-{section['version']}" / section["binary_path"]
+    installed = cache / f"patchelf-{section['version']}" / str(section["binary_path"])
     if not installed.is_file():
         entry = host_entry(section, "patchelf")
         archive = acquire(entry, cache, what="patchelf")
