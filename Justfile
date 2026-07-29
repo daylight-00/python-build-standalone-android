@@ -40,6 +40,10 @@ test *args:
 validate +archives:
   uv run ./validate-distribution.py {{archives}}
 
+# Measure the API floor the flagship's stated rule selects.
+api-level *args:
+  uv run ./resolve-api-level.py {{args}}
+
 # Print the CI build matrix ci-targets.yaml implies.
 matrix:
   uv run ./ci-matrix.py --pretty

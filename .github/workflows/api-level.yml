@@ -1,0 +1,74 @@
+name: api-level
+
+# The flagship's minimum API level follows a rule rather than a preference, and
+# the rule's inputs — the pinned CPython source and the pinned NDK — are the only
+# things that can move the answer. So this runs when one of them changes, and on
+# a schedule in case neither does for a long time.
+#
+# Deliberately not part of a build. It would cost every build the measurement,
+# and a floor that moved silently would defeat the release notes that exist to
+# announce it. The declared value stays the decision of record; this reports
+# when it has gone stale.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/**"
+      - "ci-targets.yaml"
+      - "resolve-api-level.py"
+      - "pythonbuild/api_level.py"
+  pull_request:
+    paths:
+      - "config/**"
+      - "ci-targets.yaml"
+      - "resolve-api-level.py"
+      - "pythonbuild/api_level.py"
+  schedule:
+    # Weekly. Nothing here is urgent; a floor that moved will keep.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+env:
+  FORCE_COLOR: 1
+
+# Nothing: this measures and reports through the run's own log.
+permissions: {}
+
+jobs:
+  resolve:
+    name: measure the flagship API floor
+    runs-on: ubuntu-latest
+    # A build interpreter, then one configure per candidate level.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
+      # Assigned to a variable first: `echo "x=$(cmd)"` reports echo's exit
+      # status, so a failing cmd would leave an empty output and a green step.
+      - name: Resolve the pinned NDK
+        id: pins
+        run: |
+          ndk=$(jq -er '.ndk.revision' config/toolchain.lock.json)
+          echo "ndk=$ndk" >> "$GITHUB_OUTPUT"
+
+      - name: Install the pinned NDK
+        run: |
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;${{ steps.pins.outputs.ndk }}"
+
+      - name: Cache pinned downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: downloads
+          key: downloads-${{ hashFiles('config/**/*.json') }}
+
+      - name: Measure
+        run: uv run ./resolve-api-level.py --check
