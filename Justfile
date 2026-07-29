@@ -36,6 +36,10 @@ fmt:
 test *args:
   uv run python -m unittest discover -s tests -t . {{args}}
 
+# Hold finished archives to the distribution contract.
+validate +archives:
+  uv run ./validate-distribution.py {{archives}}
+
 # Print the CI build matrix ci-targets.yaml implies.
 matrix:
   uv run ./ci-matrix.py --pretty
