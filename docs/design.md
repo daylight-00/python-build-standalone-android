@@ -371,6 +371,16 @@ Values that upstream reads out of a running interpreter are taken from PEP 739
 magic number into a C constant and the distribution contains no `.pyc` to read
 it from.
 
+Upstream's reader is the check that decides whether this file conforms.
+`src/json.rs` is `#[serde(deny_unknown_fields)]` and leaves most fields outside
+`Option`, so an unknown key and a missing required one are both errors. Seven
+required fields were once left out here on the grounds that this project
+produces no object graph, which made the file unreadable by upstream's own
+tooling. Empty is how the format says *none*: no object files ship, so `objs` is
+`[]`; no relinkable inittab exists, so `inittab_object` is `""`. Fields that
+upstream marks optional and that would describe something absent are still
+omitted, and `tests/test_python_json.py` holds the file to the schema.
+
 Deliberate deviations:
 
 - **`build_options` carries provenance** (`upstream`) rather than an
@@ -384,11 +394,15 @@ Deliberate deviations:
 - **`python_config_vars`** has host paths removed and prefix-relative paths
   substituted, because the upstream package's values name the machine that built
   it.
-- **`run_tests` is omitted.** Upstream points it at a real test harness; this
-  project has none yet, and naming a file that does not exist would be worse
-  than leaving the field out.
-- **Producer fields are omitted, not invented.** For `upstream` there are no
-  core object files, no static libpython, and no relinkable inittab.
+- **`run_tests` names a harness that runs on a device.** It points at
+  `build/run_tests.py`, the path upstream uses, and the script there re-executes
+  the interpreter against the `test` package the distribution ships. Upstream
+  passes `--slow-ci`; this does not, because on a device that profile runs for
+  hours and much of it is unsupported on Android, so the caller chooses.
+- **Producer object-graph fields are empty rather than absent.** Neither build
+  ships core object files, a static libpython, or a relinkable inittab. Saying
+  so with an empty list is a fact about the distribution; leaving the field out
+  said the same thing to a reader and nothing at all to a parser.
 
 ## Artifact naming
 

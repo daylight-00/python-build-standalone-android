@@ -1,9 +1,15 @@
 """Generate ``python/PYTHON.json`` in Astral metadata format 8.
 
-Standard fields keep their standard meaning. Fields describing a producer object
-graph this project does not own are omitted rather than invented: for the
-upstream-derived target there are no core object files, no static libpython, and
-no relinkable inittab, so nothing claims otherwise.
+Standard fields keep their standard meaning. Where a field describes a producer
+object graph this project does not ship, it says so — an empty list of object
+files is a fact about the distribution, not a claim about one that does not
+exist. Fields that are genuinely optional in upstream's schema and would
+describe something absent stay out.
+
+Upstream's reader is the test that matters: ``src/json.rs`` declares most of
+these fields non-optional and rejects unknown ones, so a file that leaves a
+required one out cannot be read by upstream's own tooling, however truthful the
+omission was.
 """
 
 from __future__ import annotations
@@ -14,8 +20,17 @@ from typing import Any
 
 from .elf import elf_surface, is_elf
 from .runtime_metadata import Layout
-from .targets import Build
+from .targets import ROOT, Build
 from .utils import read_json
+
+# The test harness ``run_tests`` names, at the path upstream ships its own at.
+# Under python/build/, so it travels with ``full`` — as upstream's does.
+RUN_TESTS = "build/run_tests.py"
+RUN_TESTS_SOURCE = ROOT / "cpython-android/run_tests.py"
+
+# Every ELF this project produces or repackages. Named because upstream's schema
+# requires the format even when no object files ship.
+OBJECT_FILE_FORMAT = "elf"
 
 # The SPDX identifiers upstream uses for CPython itself.
 CPYTHON_LICENSES = ["Python-2.0", "CNRI-Python"]
@@ -183,6 +198,10 @@ def build_python_json(
                     "in_core": False,
                     "init_fn": f"PyInit_{name}",
                     "links": _links(elf_surface(path, readelf)["needed"], providers),
+                    # No object files ship. Each module is already linked into the
+                    # shared library named below, so there is nothing to relink
+                    # from and this list is empty rather than absent.
+                    "objs": [],
                     "required": False,
                     "shared_lib": "install/" + path.relative_to(install).as_posix(),
                     "variant": "shared-library",
@@ -190,7 +209,11 @@ def build_python_json(
             )
 
     libpython = install / layout.libpython
-    core: dict[str, Any] = {"shared_lib": f"install/{layout.libpython}", "links": []}
+    core: dict[str, Any] = {
+        "shared_lib": f"install/{layout.libpython}",
+        "links": [],
+        "objs": [],
+    }
     if is_elf(libpython):
         core["links"] = _links(elf_surface(libpython, readelf)["needed"], providers)
 
@@ -263,7 +286,19 @@ def build_python_json(
         },
         "libpython_link_mode": "shared",
         "python_extension_module_loading": ["builtin", "shared-library"],
-        "build_info": {"core": core, "extensions": dict(sorted(extensions.items()))},
+        "run_tests": RUN_TESTS,
+        "build_info": {
+            "core": core,
+            "extensions": dict(sorted(extensions.items())),
+            # A relinkable inittab is upstream's, and this project ships none:
+            # both builds link the interpreter as a shared library and hand over
+            # the result. The schema types these as plain strings and a list, so
+            # empty is how the file says the distribution has none.
+            "inittab_object": "",
+            "inittab_source": "",
+            "inittab_cflags": [],
+            "object_file_format": OBJECT_FILE_FORMAT,
+        },
         "licenses": CPYTHON_LICENSES,
         # Upstream keeps this at python/licenses/, a sibling of python/install/
         # that the install-only projection drops. Keeping it inside the prefix

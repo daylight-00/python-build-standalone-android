@@ -29,7 +29,7 @@ from .archive import (
 from .elf import elf_objects, is_elf, set_relative_runpaths, strip_object, tool_identity
 from .launcher import build_launcher
 from .pip_surface import install_bundled_pip
-from .python_json import build_python_json
+from .python_json import RUN_TESTS, RUN_TESTS_SOURCE, build_python_json
 from .runtime_metadata import apply_consumer_overlay, sysconfig_vars_json
 from .targets import ROOT, Build
 from .toolchain import Toolchain
@@ -138,6 +138,22 @@ def _install_licenses(install: Path) -> dict[str, Any]:
         "manifest": f"{LICENSES}/{manifest.name}",
         "files": rows,
     }
+
+
+def _install_test_harness(build_root: Path) -> dict[str, Any]:
+    """Ship the harness that ``PYTHON.json``'s ``run_tests`` names.
+
+    The field is a plain string in upstream's schema, so there is no way to say
+    "absent" that a consumer can read; omitting it made the file unparseable by
+    upstream's own reader. Shipping a harness that works is the answer that
+    invents nothing — the distribution already carries the ``test`` package, so
+    the script has something real to run.
+    """
+    build_root.mkdir(parents=True, exist_ok=True)
+    target = build_root / Path(RUN_TESTS).name
+    shutil.copyfile(RUN_TESTS_SOURCE, target)
+    os.chmod(target, 0o755)
+    return {"path": RUN_TESTS, "sha256": sha256_path(target)}
 
 
 def _normalize_host_paths(root: Path, host_paths: tuple[tuple[str, str], ...]) -> dict[str, Any]:
@@ -298,6 +314,7 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
 
         if source.retained is not None:
             _copy_retained_material(source.retained, build_root)
+        test_harness = _install_test_harness(build_root)
         records = build_root / "records"
         write_json(records / "input.json", {"schema_version": 1, **source.record})
         if launcher_record is not None:
@@ -310,6 +327,7 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
                 "runtime_metadata": overlay,
                 "pip_surface": pip,
                 "licenses": licenses,
+                "test_harness": test_harness,
             },
         )
         write_json(
