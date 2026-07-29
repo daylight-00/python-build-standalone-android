@@ -39,7 +39,6 @@ def make_build(
         if runtime_data is None
         else runtime_data,
         uv_catalog="download-metadata.json",
-        python_versions=("3.14",),
     )
 
 

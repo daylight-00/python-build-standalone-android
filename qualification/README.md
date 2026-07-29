@@ -5,12 +5,18 @@ matters most therefore happens on a device, out of band, and its result is
 committed here.
 
 ```
-qualification/<tag>/<triple>[-<build option>].json
+qualification/<tag>/cpython-<version>-<triple>[-<build option>].json
 ```
 
 The release workflow refuses to publish a build unless a receipt here covers
 every artifact in the release by SHA-256. A receipt is evidence only for the
 bytes it names.
+
+The name mirrors the artifact stem without the tag, which the directory already
+carries, so a listing says which Python each receipt qualified. Nothing depends
+on it, though: the gate finds a receipt by the artifact it records having run
+against, not by its filename, so a receipt cannot claim a build by being named
+after one.
 
 ## Producing one
 

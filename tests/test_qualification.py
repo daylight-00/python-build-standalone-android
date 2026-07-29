@@ -15,15 +15,35 @@ from typing import Any
 
 from pythonbuild.qualification import (
     QualificationError,
+    find_receipt,
     previous_qualified_tag,
+    receipt_path,
     shipped_api_levels,
     verify,
 )
 from tests.support import make_build
 
-FULL = {"filename": "cpython-full.tar.zst", "sha256": "a" * 64}
-INSTALL_ONLY = {"filename": "cpython-install_only.tar.gz", "sha256": "b" * 64}
-STRIPPED = {"filename": "cpython-install_only_stripped.tar.gz", "sha256": "c" * 64}
+# Real artifact names: the gate reads the build and version a receipt covers out
+# of the artifact it ran against, so a fixture with an invented name would be
+# testing a shape this project never publishes.
+VERSION = "3.14.6"
+TAG = "20260729"
+STEM = f"cpython-{VERSION}+{TAG}-aarch64-linux-android"
+
+
+def named(
+    flavor: str, digest: str, infix: str = "aarch64-linux-android"
+) -> dict[str, str]:
+    suffix = "tar.zst" if flavor == "full" else "tar.gz"
+    return {
+        "filename": f"cpython-{VERSION}+{TAG}-{infix}-{flavor}.{suffix}",
+        "sha256": digest * 64,
+    }
+
+
+FULL = named("full", "a")
+INSTALL_ONLY = named("install_only", "b")
+STRIPPED = named("install_only_stripped", "c")
 ARTIFACTS = {
     "full": FULL,
     "install_only": INSTALL_ONLY,
@@ -86,7 +106,7 @@ class GateTest(unittest.TestCase):
         api_level: int = 34,
         runtime_data: dict[str, Any] | None = None,
         artifacts: dict[str, dict[str, str]] | None = None,
-        tag: str = "20260729",
+        tag: str = TAG,
     ) -> dict[str, Any]:
         build = make_build(build_option, api_level=api_level, runtime_data=runtime_data)
         with TemporaryDirectory() as tmp:
@@ -94,7 +114,7 @@ class GateTest(unittest.TestCase):
             if document is not None:
                 directory = root / tag
                 directory.mkdir(parents=True)
-                path = directory / f"{build.artifact_infix}.json"
+                path = directory / f"cpython-{VERSION}-{build.artifact_infix}.json"
                 path.write_text(json.dumps(document), encoding="utf-8")
             return verify(build, tag, artifacts or ARTIFACTS, root=root)
 
@@ -125,16 +145,13 @@ class GateTest(unittest.TestCase):
 
     def test_an_artifact_the_receipt_does_not_name(self) -> None:
         # The reason receipts cannot be carried forward: a rebuild changes bytes.
-        rebuilt = {
-            **ARTIFACTS,
-            "full": {"filename": FULL["filename"], "sha256": "d" * 64},
-        }
+        rebuilt = {**ARTIFACTS, "full": {**FULL, "sha256": "d" * 64}}
         self.refuses(
             "does not cover every artifact", document=receipt(), artifacts=rebuilt
         )
 
     def test_the_receipt_ran_against_something_not_in_this_release(self) -> None:
-        stray = {"filename": "elsewhere.tar.gz", "sha256": "e" * 64}
+        stray = {**named("full", "e"), "sha256": "e" * 64}
         self.refuses(
             "which is not in this release",
             document=receipt(
@@ -191,11 +208,26 @@ class GateTest(unittest.TestCase):
         document = receipt()
         document["checks"]["runtime_data"]["ca_certificate_count"] = 0
         document["checks"]["identity"]["android_api_level"] = 24
+        upstream = {
+            "full": named("full", "a", "aarch64-linux-android-upstream"),
+            "install_only": named(
+                "install_only", "b", "aarch64-linux-android-upstream"
+            ),
+            "install_only_stripped": named(
+                "install_only_stripped", "c", "aarch64-linux-android-upstream"
+            ),
+        }
+        document["executed_artifact"] = dict(upstream["install_only_stripped"])
+        document["bound_artifacts"] = [
+            dict(upstream["full"]),
+            dict(upstream["install_only"]),
+        ]
         result = self.check(
             document,
             build_option="upstream",
             api_level=24,
             runtime_data={"mechanism": "data-product"},
+            artifacts=upstream,
         )
         self.assertEqual(result["runtime_data"]["ca_certificate_count"], 0)
 
@@ -225,7 +257,10 @@ class HistoryTest(unittest.TestCase):
         document = receipt()
         document["verdict"] = {"pass": passed, "failures": []}
         document["checks"]["identity"]["android_api_level"] = level
-        (directory / f"{infix}.json").write_text(json.dumps(document), encoding="utf-8")
+        document["executed_artifact"] = dict(named("install_only_stripped", "c", infix))
+        (directory / f"cpython-{VERSION}-{infix}.json").write_text(
+            json.dumps(document), encoding="utf-8"
+        )
 
     def test_levels_are_read_per_build(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -266,3 +301,53 @@ class HistoryTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DiscoveryTest(unittest.TestCase):
+    """A receipt is found by what it covers, not by what it is called."""
+
+    def write(self, directory: Path, name: str, document: dict[str, Any]) -> Path:
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / name
+        path.write_text(json.dumps(document), encoding="utf-8")
+        return path
+
+    def test_a_receipt_is_found_under_any_filename(self) -> None:
+        build = make_build()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write(root / TAG, "anything-at-all.json", receipt())
+            found = find_receipt(build, TAG, VERSION, root)
+        self.assertIsNotNone(found)
+
+    def test_a_receipt_for_another_version_is_not_used(self) -> None:
+        # The collision the version exists to prevent: same build option, other
+        # series, same tag.
+        build = make_build()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write(
+                root / TAG, f"cpython-{VERSION}-aarch64-linux-android.json", receipt()
+            )
+            self.assertIsNone(find_receipt(build, TAG, "3.15.0", root))
+
+    def test_a_receipt_for_another_build_option_is_not_used(self) -> None:
+        build = make_build("upstream")
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write(root / TAG, "flagship.json", receipt())
+            self.assertIsNone(find_receipt(build, TAG, VERSION, root))
+
+    def test_the_canonical_name_says_the_version_and_the_build(self) -> None:
+        path = receipt_path(make_build(), TAG, VERSION, Path("qualification"))
+        self.assertEqual(
+            path.as_posix(),
+            f"qualification/{TAG}/cpython-{VERSION}-aarch64-linux-android.json",
+        )
+
+    def test_a_file_that_is_not_a_receipt_is_ignored(self) -> None:
+        build = make_build()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write(root / TAG, "notes.json", {"hello": "world"})
+            self.assertIsNone(find_receipt(build, TAG, VERSION, root))

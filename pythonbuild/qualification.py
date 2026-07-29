@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .artifacts import ArtifactName, parse
 from .targets import ROOT, Build
 from .utils import read_json_object
 
@@ -23,8 +24,29 @@ QUALIFICATION_ROOT = ROOT / "qualification"
 ACCEPTED_ABIS = ("arm64-v8a", "aarch64", "arm64")
 
 
-def receipt_path(build: Build, tag: str, root: Path = QUALIFICATION_ROOT) -> Path:
-    return root / tag / f"{build.artifact_infix}.json"
+def receipt_path(
+    build: Build, tag: str, python_version: str, root: Path = QUALIFICATION_ROOT
+) -> Path:
+    """Where a receipt for this build and version belongs.
+
+    Named after the artifact stem without the tag, which the directory already
+    carries. The version is in it because a receipt that does not name the Python
+    it qualified cannot be told apart from one for another series at the same tag
+    — and because reading a directory should not require opening every file.
+    """
+    return root / tag / f"cpython-{python_version}-{build.artifact_infix}.json"
+
+
+def describes(receipt: dict[str, Any]) -> ArtifactName | None:
+    """What build and version a receipt covers, read out of the receipt.
+
+    Taken from the artifact it ran against rather than from its own filename, so
+    a receipt is identified by what it did and not by what the operator happened
+    to call it.
+    """
+    executed = receipt.get("executed_artifact") or {}
+    filename = executed.get("filename")
+    return parse(str(filename)) if filename else None
 
 
 def _display_path(path: Path) -> str:
@@ -40,9 +62,13 @@ def _display_path(path: Path) -> str:
         return path.as_posix()
 
 
-def _passing_api_levels(directory: Path) -> dict[str, int]:
-    """The API level each passing receipt in ``directory`` recorded, by artifact infix."""
-    levels: dict[str, int] = {}
+def passing_receipts(directory: Path) -> list[tuple[ArtifactName, dict[str, Any]]]:
+    """Every receipt in ``directory`` that passed, with what it says it covers.
+
+    Keyed on the receipt's content rather than its filename, so a rename cannot
+    hide a receipt and a receipt cannot claim a build by being named after one.
+    """
+    found: list[tuple[ArtifactName, dict[str, Any]]] = []
     for path in sorted(directory.glob("*.json")):
         try:
             receipt = read_json_object(path)
@@ -52,11 +78,21 @@ def _passing_api_levels(directory: Path) -> dict[str, int]:
             continue
         if not (receipt.get("verdict") or {}).get("pass"):
             continue
+        described = describes(receipt)
+        if described is not None:
+            found.append((described, receipt))
+    return found
+
+
+def _passing_api_levels(directory: Path) -> dict[str, int]:
+    """The API level each passing receipt recorded, by artifact infix."""
+    levels: dict[str, int] = {}
+    for described, receipt in passing_receipts(directory):
         level = ((receipt.get("checks") or {}).get("identity") or {}).get(
             "android_api_level"
         )
         if level is not None:
-            levels[path.stem] = int(level)
+            levels[described.artifact_infix] = int(level)
     return levels
 
 
@@ -92,6 +128,40 @@ class QualificationError(RuntimeError):
     """The release must not proceed."""
 
 
+def _version_of(artifacts: dict[str, dict[str, Any]]) -> str:
+    """The Python version these artifacts are of, read off their names."""
+    for record in artifacts.values():
+        described = parse(str(record.get("filename", "")))
+        if described is not None:
+            return described.version
+    raise QualificationError(
+        f"none of these artifacts has a name this project publishes: "
+        f"{sorted(str(r.get('filename')) for r in artifacts.values())}"
+    )
+
+
+def find_receipt(
+    build: Build, tag: str, python_version: str, root: Path = QUALIFICATION_ROOT
+) -> tuple[Path, dict[str, Any]] | None:
+    """The receipt at ``tag`` covering this build and version, whatever its name."""
+    directory = root / tag
+    if not directory.is_dir():
+        return None
+    for path in sorted(directory.glob("*.json")):
+        try:
+            receipt = read_json_object(path)
+        except (OSError, ValueError):
+            continue
+        described = describes(receipt)
+        if (
+            described is not None
+            and described.artifact_infix == build.artifact_infix
+            and described.version == python_version
+        ):
+            return path, receipt
+    return None
+
+
 def verify(
     build: Build,
     tag: str,
@@ -104,13 +174,19 @@ def verify(
     ``artifacts`` maps flavor to a record carrying ``filename`` and ``sha256``,
     as ``build.py`` writes them.
     """
-    path = receipt_path(build, tag, root)
-    if not path.is_file():
+    python_version = _version_of(artifacts)
+    found = find_receipt(build, tag, python_version, root)
+    if found is None:
+        expected = receipt_path(build, tag, python_version, root)
+        present = sorted(p.name for p in (root / tag).glob("*.json"))
+        holds = f"\n{_display_path(root / tag)} holds: {present}" if present else ""
         raise QualificationError(
-            f"no device qualification receipt for {build.name} at {tag}.\n"
-            f"Run qualify.py on a device and commit the result to {_display_path(path)}."
+            f"no device qualification receipt for {build.name} {python_version} "
+            f"at {tag}.\n"
+            f"Run qualify.py on a device and commit the result to "
+            f"{_display_path(expected)}.{holds}"
         )
-    receipt = read_json_object(path)
+    path, receipt = found
 
     if receipt.get("receipt_kind") != "android-device-qualification":
         raise QualificationError(f"{path} is not a device qualification receipt")

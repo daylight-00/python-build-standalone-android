@@ -47,7 +47,6 @@ class Build:
     android_api: AndroidApi
     runtime_data: dict[str, Any]
     uv_catalog: str
-    python_versions: tuple[str, ...]
 
     @property
     def name(self) -> str:
@@ -103,7 +102,6 @@ def _build(
         ),
         runtime_data=dict(entry["runtime_data"]),
         uv_catalog=entry["uv_catalog"],
-        python_versions=tuple(triple_entry["python_versions"]),
     )
 
 

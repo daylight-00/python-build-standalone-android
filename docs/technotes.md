@@ -249,7 +249,9 @@ and re-checked. It uses only the standard library, because a device is not
 guaranteed to have anything else, and it never raises: a probe that cannot even
 start is recorded as a failure rather than losing the receipt.
 
-Receipts are committed under `qualification/<tag>/<build>.json`, and the release
+Receipts are committed under `qualification/<tag>/cpython-<version>-<build>.json`
+— named after the artifact stem, so a directory says which Python each receipt
+qualified without opening it — and the release
 workflow refuses to publish unless one covers **every artifact in the release by
 SHA-256**. A receipt is evidence only for the bytes it names, so one produced
 against an earlier build cannot be carried forward silently. The gate also

@@ -68,7 +68,8 @@ $ python3 qualify.py cpython-3.14.6+20260729-…-install_only_stripped.tar.gz \
 ```
 
 The receipt it writes binds its findings to the exact archive bytes. Commit it
-under `qualification/<tag>/<build>.json`; the release workflow refuses to
+under `qualification/<tag>/cpython-<version>-<build>.json`; the release workflow
+refuses to
 publish unless one covers every artifact by SHA-256. `check-qualification.py`
 answers whether a committed receipt covers what you just built.
 

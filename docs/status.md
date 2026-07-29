@@ -9,9 +9,9 @@ because the uv catalog pins them by hash.
 
 Publishing is gated on a device qualification receipt covering every artifact in
 the release by SHA-256, and the receipts are committed under
-`qualification/<tag>/<build>.json`. A receipt is evidence only for the bytes it
-names, so what follows describes the artifacts a release actually shipped rather
-than the project in general.
+`qualification/<tag>/cpython-<version>-<build>.json`. A receipt is evidence only
+for the bytes it names, so what follows describes the artifacts a release
+actually shipped rather than the project in general.
 
 A release may also be published without one, when nothing but the pinned CPython
 input has changed since the last release that had one. Such a release is marked

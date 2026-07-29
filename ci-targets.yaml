@@ -17,8 +17,6 @@ android:
     abi: arm64-v8a
     libc: bionic
     ndk: "27.3.13750724"
-    python_versions:
-      - "3.14"
 
     build_options:
       default:
