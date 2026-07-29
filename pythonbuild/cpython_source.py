@@ -69,6 +69,7 @@ def build_cpython(
     readelf: str,
     source_date_epoch: int,
     host_paths: tuple[tuple[str, str], ...],
+    sdk_root: Path,
     lock_path: Path,
 ) -> tuple[Path, dict[str, Any]]:
     """Cross-compile CPython against an already-built dependency prefix."""
@@ -103,6 +104,8 @@ def build_cpython(
 
     environment = dict(os.environ)
     environment["ANDROID_API_LEVEL"] = str(android_api)
+    # Android/android.py refuses to run without it.
+    environment.setdefault("ANDROID_HOME", str(sdk_root))
     environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
     # The tools are named without their directory, so the directory has to be on
     # PATH. The environment script puts it there for the steps that source it, but
@@ -277,6 +280,7 @@ def prepare_source_prefix(
         source_date_epoch=source_date_epoch,
         host_paths=host_paths,
         pkg_config_bin=pkg_config_bin,
+        sdk_root=toolchain.sdk_root,
     )
     built_prefix, cpython = build_cpython(
         workspace=workspace / "cpython",
@@ -290,6 +294,7 @@ def prepare_source_prefix(
         readelf=str(toolchain.readelf),
         source_date_epoch=source_date_epoch,
         host_paths=host_paths,
+        sdk_root=toolchain.sdk_root,
         lock_path=build.input_lock_path(),
     )
 

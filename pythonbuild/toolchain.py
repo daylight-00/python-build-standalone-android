@@ -55,6 +55,18 @@ class Toolchain:
     patchelf: Path
     patchelf_version: str
 
+    @property
+    def sdk_root(self) -> Path:
+        """The SDK the NDK sits in, for the recipes that insist on ANDROID_HOME.
+
+        Derived rather than required from the caller. Both upstream's
+        ``android-env.sh`` and ``Android/android.py`` refuse to run without
+        ANDROID_HOME, and a build that has already located the NDK knows where
+        the SDK is. CI exports it, which is why a local source build failed on a
+        machine where only the NDK had been found.
+        """
+        return self.ndk.parent.parent if self.ndk.parent.name == "ndk" else self.ndk
+
     def identity(self) -> dict[str, Any]:
         """Toolchain provenance with no host paths in it.
 

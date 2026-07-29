@@ -295,6 +295,7 @@ def build_dependencies(
     readelf: str,
     source_date_epoch: int,
     host_paths: tuple[tuple[str, str], ...],
+    sdk_root: Path,
     pkg_config_bin: Path,
     lock_path: Path = RECIPE_LOCK,
 ) -> tuple[Path, dict[str, Any]]:
@@ -314,6 +315,9 @@ def build_dependencies(
 
     environment = dict(os.environ)
     environment["ANDROID_API_LEVEL"] = str(android_api)
+    # The recipes' android-env.sh refuses to run without it, and this build
+    # already knows where the SDK is.
+    environment.setdefault("ANDROID_HOME", str(sdk_root))
     environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
     environment["PATH"] = os.pathsep.join(
         [str(pkg_config_bin), environment.get("PATH", "")]
