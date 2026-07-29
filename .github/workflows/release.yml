@@ -19,6 +19,13 @@ on:
         description: "Build, gate, and assemble everything without publishing."
         type: boolean
         default: true
+      allow-waiver:
+        description: >-
+          Publish without a device receipt when nothing but the pinned CPython
+          input has changed since the last qualified tag. Such a release is
+          marked as a prerelease and does not become what uv installs.
+        type: boolean
+        default: false
 
 env:
   FORCE_COLOR: 1
@@ -89,6 +96,9 @@ jobs:
         with:
           ref: ${{ inputs.sha }}
           persist-credentials: false
+          # A waiver is decided by diffing against the last qualified tag, so the
+          # tag and the history between it and here have to be present.
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
@@ -143,10 +153,15 @@ jobs:
 
       # CI has no Android runner, so the one check that matters most is produced
       # on a device and committed. It has to cover these exact bytes.
+      # A waived release is not device-qualified, and the verdict travels with
+      # the artifacts so publish can tell the two apart without reading prose.
       - name: Device qualification gate
         env:
           TAG: ${{ inputs.tag }}
-        run: uv run ./check-qualification.py --target ${{ matrix.build }} --tag "$TAG"
+          WAIVER: ${{ inputs.allow-waiver && '--allow-waiver' || '' }}
+        run: |
+          uv run ./check-qualification.py --target ${{ matrix.build }} --tag "$TAG" \
+            $WAIVER --report "dist/${{ matrix.artifact }}.qualification.json"
 
       - name: Generate the uv catalog
         env:
@@ -186,6 +201,25 @@ jobs:
         with:
           path: incoming
 
+      # Read out of what the gate recorded, not out of the dispatch input: a
+      # release is qualified when every build in it was, whatever was asked for.
+      - name: Determine whether this release is device-qualified
+        id: channel
+        run: |
+          waived=$(grep -rl '"device_qualified": false' incoming --include='*.qualification.json' | wc -l)
+          total=$(find incoming -name '*.qualification.json' | wc -l)
+          if [ "$total" -eq 0 ]; then
+            echo "no qualification verdicts were recorded" >&2
+            exit 1
+          fi
+          if [ "$waived" -gt 0 ]; then
+            echo "qualified=false" >> "$GITHUB_OUTPUT"
+            echo "$waived of $total builds are not device-qualified"
+          else
+            echo "qualified=true" >> "$GITHUB_OUTPUT"
+            echo "all $total builds are device-qualified"
+          fi
+
       - name: Collect the release assets
         run: |
           mkdir -p dist
@@ -201,6 +235,7 @@ jobs:
         run: |
           uv sync
           uv run ./release-notes.py --tag "$TAG" --dist-dir incoming \
+            ${{ steps.channel.outputs.qualified == 'false' && '--not-device-qualified' || '' }} \
             -o dist/RELEASE_NOTES.md
           cat dist/RELEASE_NOTES.md
 
@@ -223,6 +258,7 @@ jobs:
             --target "$SHA" \
             --title "$TAG" \
             --draft \
+            ${{ steps.channel.outputs.qualified == 'false' && '--prerelease' || '' }} \
             --notes-file dist/RELEASE_NOTES.md
           gh release upload "$TAG" dist/*.tar.zst dist/*.tar.gz \
             dist/SHA256SUMS dist/download-metadata*.json
@@ -236,8 +272,11 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: gh release edit "$TAG" --draft=false
 
+      # Only for a qualified release. The catalogs are what `uv python install`
+      # resolves, so pointing them at bytes no device ran would make the
+      # unverified build the default rather than an opt-in.
       - name: Update the latest-release branch
-        if: ${{ !inputs.dry-run }}
+        if: ${{ !inputs.dry-run && steps.channel.outputs.qualified == 'true' }}
         env:
           TAG: ${{ inputs.tag }}
         run: |
@@ -258,6 +297,16 @@ jobs:
           git add -- ./download-metadata*.json ./latest-release.json
           git commit -m "chore: publish $TAG catalogs"
           git push origin latest-release
+
+      - name: Note that the catalogs were left alone
+        if: ${{ !inputs.dry-run && steps.channel.outputs.qualified == 'false' }}
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          echo "$TAG is published as a prerelease and is not device-qualified."
+          echo "latest-release and the uv catalogs still point at the last"
+          echo "qualified release. To promote it, qualify these exact artifacts"
+          echo "on a device, commit the receipt, and re-run without --allow-waiver."
 
       - name: Dry run summary
         if: ${{ inputs.dry-run }}

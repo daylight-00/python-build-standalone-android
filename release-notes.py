@@ -38,6 +38,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "that has a committed qualification receipt",
     )
     parser.add_argument("--repository", default=REPOSITORY)
+    parser.add_argument(
+        "--not-device-qualified",
+        action="store_true",
+        help="state prominently that no device receipt covers these bytes",
+    )
     parser.add_argument("-o", "--output", type=Path)
     return parser.parse_args(argv)
 
@@ -64,6 +69,27 @@ def _resolve(receipt: dict[str, Any], builds: dict[str, Build]) -> Build:
             f"entry in ci-targets.yaml"
         )
     return build
+
+
+def _unqualified_callout() -> list[str]:
+    """A release nobody ran has to say so before it says anything else."""
+    return [
+        "> [!CAUTION]",
+        "> **No device qualification receipt covers these archives.** Every release "
+        "before this one was run on a physical device first; this one was not.",
+        ">",
+        "> It was published because nothing but the pinned CPython input changed "
+        "since the last release that was — so the launcher, the loader "
+        "normalization, the metadata overlay and the licence set are the same code "
+        "a device did run. What is unverified is whatever came with the new "
+        "upstream: that every extension module still loads, that the compiled-in "
+        "trust store still resolves, and that the prefix still relocates.",
+        ">",
+        "> `uv python install` is unaffected — the catalogs still resolve to the "
+        "last qualified release. Taking this one is an explicit choice: download "
+        "an archive, or point `--python-downloads-json-url` at this tag.",
+        "",
+    ]
 
 
 def _floor_callout(previous: str, moved: list[tuple[str, int, int]]) -> list[str]:
@@ -110,6 +136,8 @@ def render(
     tag: str,
     repository: str,
     previous_tag: str | None = None,
+    *,
+    device_qualified: bool = True,
 ) -> str:
     builds = load_builds()
     # Ordered by build, flagship first, rather than by whatever order the receipts
@@ -126,6 +154,8 @@ def render(
         )
     ]
     lines: list[str] = []
+    if not device_qualified:
+        lines.extend(_unqualified_callout())
 
     # Above everything else, because a reader who takes in nothing but the first
     # paragraph still has to learn that their device may have dropped out.
@@ -193,10 +223,16 @@ def render(
     lines.append(f"$ gh attestation verify <archive> --repo {repository}")
     lines.append("```")
     lines.append("")
-    lines.append(
-        "Every archive was built twice and compared byte for byte, and each build was run "
-        "on a physical device before this release was cut."
-    )
+    if device_qualified:
+        lines.append(
+            "Every archive was built twice and compared byte for byte, and each build "
+            "was run on a physical device before this release was cut."
+        )
+    else:
+        lines.append(
+            "Every archive was built twice and compared byte for byte. None of them was "
+            "run on a device — see the caution above."
+        )
 
     return "\n".join(lines) + "\n"
 
@@ -211,7 +247,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     receipts = [read_json_object(path) for path in paths]
 
-    notes = render(receipts, args.tag, args.repository, args.previous_tag)
+    notes = render(
+        receipts,
+        args.tag,
+        args.repository,
+        args.previous_tag,
+        device_qualified=not args.not_device_qualified,
+    )
     if args.output:
         args.output.write_text(notes, encoding="utf-8")
         print(f"wrote {args.output}")
