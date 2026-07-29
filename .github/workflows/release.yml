@@ -45,23 +45,44 @@ jobs:
           SHA: ${{ inputs.sha }}
         run: echo "Release of $SHA as $TAG approved"
 
+  # Read out of ci-targets.yaml, at the commit being released rather than at the
+  # tip of main: the release must build what that commit declares.
+  matrix:
+    name: resolve the build matrix
+    needs: gate
+    runs-on: ubuntu-latest
+    outputs:
+      builds: ${{ steps.resolve.outputs.builds }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
+      # Assigned to a variable first: `echo "x=$(cmd)"` reports echo's exit
+      # status, so a failing cmd would leave an empty output and a green step.
+      - id: resolve
+        run: |
+          builds=$(uv run ./ci-matrix.py)
+          echo "builds=$builds" >> "$GITHUB_OUTPUT"
+          echo "$builds"
+
   build:
     name: build ${{ matrix.build }}
-    needs: gate
+    needs: matrix
     runs-on: ubuntu-latest
     # The source build compiles CPython and six dependencies twice, once to
     # build and once to prove the result is reproducible.
     timeout-minutes: 180
     strategy:
       fail-fast: true
-      matrix:
-        include:
-          # `artifact` exists because an artifact name cannot contain the
-          # colon that separates a triple from its build option.
-          - build: aarch64-linux-android:upstream
-            artifact: aarch64-linux-android-upstream
-          - build: aarch64-linux-android
-            artifact: aarch64-linux-android
+      matrix: ${{ fromJSON(needs.matrix.outputs.builds) }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
