@@ -48,20 +48,34 @@ print(json.dumps({
 }))
 """
 
+# Importing what happens to be in lib-dynload only proves that what shipped
+# works. It cannot notice a module that stopped being built, which is the way a
+# distribution silently loses _ssl. The expectation comes from CPython's own
+# configure decisions instead, which also covers the modules linked into the
+# interpreter rather than shipped as shared objects.
 EXTENSIONS_PROBE = """
-import importlib, json, pathlib, sys, sysconfig
-dynload = pathlib.Path(sysconfig.get_config_var("DESTSHARED"))
-suffix = sysconfig.get_config_var("EXT_SUFFIX")
+import importlib, json, sys, sysconfig
+variables = sysconfig.get_config_vars()
+states = {
+    key[len("MODULE_"):-len("_STATE")].lower(): value
+    for key, value in variables.items()
+    if key.startswith("MODULE_") and key.endswith("_STATE")
+}
+expected = sorted(name for name, state in states.items() if state == "yes")
 failures = {}
-count = 0
-for path in sorted(dynload.glob("*" + suffix)):
-    name = path.name[: -len(suffix)]
-    count += 1
+for name in expected:
     try:
         importlib.import_module(name)
     except Exception as error:
         failures[name] = f"{type(error).__name__}: {error}"
-print(json.dumps({"count": count, "failures": failures}))
+print(json.dumps({
+    "source": "sysconfigdata",
+    "expected": expected,
+    "count": len(expected),
+    "builtin": sorted(set(expected) & set(sys.builtin_module_names)),
+    "unavailable": {n: s for n, s in sorted(states.items()) if s != "yes"},
+    "failures": failures,
+}))
 """
 
 DLOPEN_PROBE = """
@@ -138,7 +152,9 @@ def sha256_path(path: Path) -> str:
     return digest.hexdigest()
 
 
-def run(command: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str] | OSError:
+def run(
+    command: list[str], env: dict[str, str]
+) -> subprocess.CompletedProcess[str] | OSError:
     """Never raise. A probe that cannot even start is a result worth recording."""
     try:
         return subprocess.run(command, capture_output=True, text=True, env=env)
@@ -155,7 +171,10 @@ def run_probe(interpreter: Path, source: str, env: dict[str, str]) -> dict[str, 
     try:
         return {"pass": True, **json.loads(result.stdout)}
     except json.JSONDecodeError:
-        return {"pass": False, "error": f"probe did not emit JSON: {result.stdout[:500]}"}
+        return {
+            "pass": False,
+            "error": f"probe did not emit JSON: {result.stdout[:500]}",
+        }
 
 
 def run_command(command: list[str], env: dict[str, str]) -> dict[str, Any]:
@@ -204,7 +223,11 @@ def extract(archive: Path, destination: Path) -> Path:
 
 def interpreter_of(prefix: Path) -> Path:
     candidates = sorted(prefix.glob("bin/python3.*"))
-    exact = [path for path in candidates if path.name.count(".") == 1 and not path.is_symlink()]
+    exact = [
+        path
+        for path in candidates
+        if path.name.count(".") == 1 and not path.is_symlink()
+    ]
     if not exact:
         raise RuntimeError(f"no versioned interpreter under {prefix}/bin")
     return exact[0]
@@ -232,7 +255,9 @@ def qualify(archive: Path, workspace: Path) -> dict[str, Any]:
     relocated_root.mkdir(parents=True, exist_ok=True)
     relocated = relocated_root / "python"
     shutil.copytree(prefix, relocated, symlinks=True)
-    checks["relocated_identity"] = run_probe(interpreter_of(relocated), IDENTITY_PROBE, env)
+    checks["relocated_identity"] = run_probe(
+        interpreter_of(relocated), IDENTITY_PROBE, env
+    )
 
     # pip is installed from the distribution's own ensurepip wheel; it must at
     # least run offline.
@@ -243,13 +268,18 @@ def qualify(archive: Path, workspace: Path) -> dict[str, Any]:
         [str(interpreter), "-m", "venv", "--without-pip", str(venv_dir)], env
     )
     if checks["venv"]["pass"]:
-        checks["venv_identity"] = run_probe(venv_dir / "bin/python", IDENTITY_PROBE, env)
+        checks["venv_identity"] = run_probe(
+            venv_dir / "bin/python", IDENTITY_PROBE, env
+        )
 
     return checks
 
 
 def evaluate(
-    checks: dict[str, Any], expected_api: int | None, *, builtin_runtime_data: bool = False
+    checks: dict[str, Any],
+    expected_api: int | None,
+    *,
+    builtin_runtime_data: bool = False,
 ) -> dict[str, Any]:
     identity = checks.get("identity", {})
     failures: list[str] = []
@@ -268,7 +298,9 @@ def evaluate(
 
     if checks.get("extensions", {}).get("failures"):
         failures.append("extension-import")
-    dlopen = {k: v for k, v in checks.get("dlopen", {}).items() if k not in ("pass", "error")}
+    dlopen = {
+        k: v for k, v in checks.get("dlopen", {}).items() if k not in ("pass", "error")
+    }
     if any(value != "pass" for value in dlopen.values()):
         failures.append("dlopen")
     if not identity.get("paths_within_prefix"):
@@ -299,7 +331,9 @@ def evaluate(
 def device() -> dict[str, Any]:
     def getprop(name: str) -> str | None:
         try:
-            result = subprocess.run(["getprop", name], capture_output=True, text=True, timeout=10)
+            result = subprocess.run(
+                ["getprop", name], capture_output=True, text=True, timeout=10
+            )
         except (OSError, subprocess.SubprocessError):
             return None
         value = result.stdout.strip()
@@ -345,7 +379,9 @@ def main(argv: list[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="qualify-") as tmp:
         checks = qualify(args.archive, Path(tmp))
 
-    verdict = evaluate(checks, args.expected_api, builtin_runtime_data=args.builtin_runtime_data)
+    verdict = evaluate(
+        checks, args.expected_api, builtin_runtime_data=args.builtin_runtime_data
+    )
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "receipt_kind": "android-device-qualification",
@@ -371,7 +407,8 @@ def main(argv: list[str] | None = None) -> int:
 
     output = args.output or Path(f"{args.archive.name}.qualification.json")
     output.write_text(
-        json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )
     print(f"{'PASS' if verdict['pass'] else 'FAIL'}  {output}")
     if not verdict["pass"]:

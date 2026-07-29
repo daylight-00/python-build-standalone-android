@@ -24,7 +24,11 @@ from tests.support import make_build
 FULL = {"filename": "cpython-full.tar.zst", "sha256": "a" * 64}
 INSTALL_ONLY = {"filename": "cpython-install_only.tar.gz", "sha256": "b" * 64}
 STRIPPED = {"filename": "cpython-install_only_stripped.tar.gz", "sha256": "c" * 64}
-ARTIFACTS = {"full": FULL, "install_only": INSTALL_ONLY, "install_only_stripped": STRIPPED}
+ARTIFACTS = {
+    "full": FULL,
+    "install_only": INSTALL_ONLY,
+    "install_only_stripped": STRIPPED,
+}
 
 
 def receipt(**overrides: Any) -> dict[str, Any]:
@@ -42,6 +46,15 @@ def receipt(**overrides: Any) -> dict[str, Any]:
             "page_size": 4096,
         },
         "checks": {
+            "extensions": {
+                "pass": True,
+                "source": "sysconfigdata",
+                "expected": ["_socket", "_ssl", "time"],
+                "count": 3,
+                "builtin": ["time"],
+                "unavailable": {"readline": "missing"},
+                "failures": {},
+            },
             "identity": {
                 "android_api_level": 34,
                 "version": "3.14.6",
@@ -100,7 +113,9 @@ class GateTest(unittest.TestCase):
         self.refuses("no device qualification receipt", document=None)
 
     def test_some_other_kind_of_json(self) -> None:
-        self.refuses("not a device qualification receipt", document=receipt(receipt_kind="other"))
+        self.refuses(
+            "not a device qualification receipt", document=receipt(receipt_kind="other")
+        )
 
     def test_the_device_reported_failure(self) -> None:
         self.refuses(
@@ -110,14 +125,21 @@ class GateTest(unittest.TestCase):
 
     def test_an_artifact_the_receipt_does_not_name(self) -> None:
         # The reason receipts cannot be carried forward: a rebuild changes bytes.
-        rebuilt = {**ARTIFACTS, "full": {"filename": FULL["filename"], "sha256": "d" * 64}}
-        self.refuses("does not cover every artifact", document=receipt(), artifacts=rebuilt)
+        rebuilt = {
+            **ARTIFACTS,
+            "full": {"filename": FULL["filename"], "sha256": "d" * 64},
+        }
+        self.refuses(
+            "does not cover every artifact", document=receipt(), artifacts=rebuilt
+        )
 
     def test_the_receipt_ran_against_something_not_in_this_release(self) -> None:
         stray = {"filename": "elsewhere.tar.gz", "sha256": "e" * 64}
         self.refuses(
             "which is not in this release",
-            document=receipt(executed_artifact=stray, bound_artifacts=list(ARTIFACTS.values())),
+            document=receipt(
+                executed_artifact=stray, bound_artifacts=list(ARTIFACTS.values())
+            ),
         )
 
     def test_an_abi_this_project_does_not_release_for(self) -> None:
@@ -127,6 +149,26 @@ class GateTest(unittest.TestCase):
 
     def test_the_interpreter_disagrees_with_the_declared_floor(self) -> None:
         self.refuses("but", document=receipt(), api_level=35)
+
+    def test_a_receipt_from_before_the_derived_module_check(self) -> None:
+        # The old probe imported whatever was in lib-dynload and reported a count,
+        # which cannot show that a module stopped being built.
+        document = receipt()
+        document["checks"]["extensions"] = {"pass": True, "count": 68, "failures": {}}
+        self.refuses("predates the derived module check", document=document)
+
+    def test_a_module_cpython_built_that_will_not_import(self) -> None:
+        document = receipt()
+        document["checks"]["extensions"]["failures"] = {
+            "_ssl": "ImportError: dlopen failed"
+        }
+        self.refuses("could not import", document=document)
+
+    def test_the_modules_it_did_check_are_reported(self) -> None:
+        result = self.check(receipt())
+        self.assertEqual(result["modules"]["expected"], 3)
+        self.assertEqual(result["modules"]["builtin"], 1)
+        self.assertEqual(result["modules"]["source"], "sysconfigdata")
 
     def test_a_receipt_from_before_the_runtime_data_probe(self) -> None:
         document = receipt()
@@ -159,18 +201,25 @@ class GateTest(unittest.TestCase):
 
     def test_a_build_that_compiles_a_tzpath_in_must_resolve_zones(self) -> None:
         document = receipt()
-        document["checks"]["runtime_data"]["zones"] = {"Asia/Seoul": "ZoneInfoNotFoundError"}
+        document["checks"]["runtime_data"]["zones"] = {
+            "Asia/Seoul": "ZoneInfoNotFoundError"
+        }
         self.refuses(
             "time zones did not resolve",
             document=document,
-            runtime_data={"mechanism": "build-default", "tzpath": "/usr/share/zoneinfo"},
+            runtime_data={
+                "mechanism": "build-default",
+                "tzpath": "/usr/share/zoneinfo",
+            },
         )
 
 
 class HistoryTest(unittest.TestCase):
     """The per-tag floor history the release notes read."""
 
-    def write(self, root: Path, tag: str, infix: str, level: int, passed: bool = True) -> None:
+    def write(
+        self, root: Path, tag: str, infix: str, level: int, passed: bool = True
+    ) -> None:
         directory = root / tag
         directory.mkdir(parents=True, exist_ok=True)
         document = receipt()

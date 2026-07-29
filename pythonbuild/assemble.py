@@ -28,12 +28,19 @@ from .archive import (
 )
 from .elf import elf_objects, is_elf, set_relative_runpaths, strip_object, tool_identity
 from .launcher import build_launcher
+from .modules import check_shared_modules
 from .pip_surface import install_bundled_pip
 from .python_json import RUN_TESTS, RUN_TESTS_SOURCE, build_python_json
-from .runtime_metadata import apply_consumer_overlay, sysconfig_vars_json
+from .runtime_metadata import Layout, apply_consumer_overlay, sysconfig_vars_json
 from .targets import ROOT, Build
 from .toolchain import Toolchain
-from .utils import file_identity, read_json_object, require_identity, sha256_path, write_json
+from .utils import (
+    file_identity,
+    read_json_object,
+    require_identity,
+    sha256_path,
+    write_json,
+)
 
 RECORDS = "build/records"
 
@@ -90,7 +97,9 @@ class BuildContext:
         return self.build.artifact_stem(python_version, self.tag)
 
 
-def _install_launcher(install: Path, launcher: Path, python_mm: str) -> list[dict[str, str]]:
+def _install_launcher(
+    install: Path, launcher: Path, python_mm: str
+) -> list[dict[str, str]]:
     bindir = install / "bin"
     bindir.mkdir(parents=True, exist_ok=True)
     executable = bindir / f"python{python_mm}"
@@ -117,7 +126,9 @@ def _install_licenses(install: Path) -> dict[str, Any]:
     for source in sorted(LICENSE_SOURCE.glob("LICENSE.*.txt")):
         shutil.copyfile(source, target / source.name)
         os.chmod(target / source.name, 0o644)
-        rows.append({"path": f"{LICENSES}/{source.name}", "sha256": sha256_path(source)})
+        rows.append(
+            {"path": f"{LICENSES}/{source.name}", "sha256": sha256_path(source)}
+        )
     shutil.copyfile(manifest, target / manifest.name)
     os.chmod(target / manifest.name, 0o644)
 
@@ -156,7 +167,9 @@ def _install_test_harness(build_root: Path) -> dict[str, Any]:
     return {"path": RUN_TESTS, "sha256": sha256_path(target)}
 
 
-def _normalize_host_paths(root: Path, host_paths: tuple[tuple[str, str], ...]) -> dict[str, Any]:
+def _normalize_host_paths(
+    root: Path, host_paths: tuple[tuple[str, str], ...]
+) -> dict[str, Any]:
     """Rewrite this machine's directories to placeholders, then prove none remain.
 
     The path turns up in more places than a list of variables would cover:
@@ -228,7 +241,9 @@ def _copy_retained_material(retained: Path, build: Path) -> None:
         copy_entry(child, target / child.name)
 
 
-def prepare_upstream_prefix(context: BuildContext, archive: Path, workspace: Path) -> PrefixSource:
+def prepare_upstream_prefix(
+    context: BuildContext, archive: Path, workspace: Path
+) -> PrefixSource:
     """Extract the official Android package into a prefix ready to package."""
     lock = context.lock
     observed = require_identity(archive, lock["archive"], "official Android package")
@@ -294,9 +309,14 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
         if source.needs_launcher:
             launcher_binary = workspace / "launcher/python"
             launcher_record = build_launcher(
-                prefix, launcher_binary, toolchain=context.toolchain, python_mm=python_mm
+                prefix,
+                launcher_binary,
+                toolchain=context.toolchain,
+                python_mm=python_mm,
             )
-            launcher_record["aliases"] = _install_launcher(install, launcher_binary, python_mm)
+            launcher_record["aliases"] = _install_launcher(
+                install, launcher_binary, python_mm
+            )
 
         # Before anything reads or records the metadata. PYTHON.json drops tokens
         # that name a producer path, so this build's own directories have to be
@@ -304,7 +324,9 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
         # where the build ran. The overlay records what it changed and from what,
         # and those hashes describe the files as they will ship.
         install_paths = _normalize_host_paths(install, source.host_paths)
-        overlay = apply_consumer_overlay(install, python_mm=python_mm, host_triple=build.triple)
+        overlay = apply_consumer_overlay(
+            install, python_mm=python_mm, host_triple=build.triple
+        )
         config_vars_source = sysconfig_vars_json(install, python_mm)
         pip = install_bundled_pip(install, python_mm)
         licenses = _install_licenses(install)
@@ -312,13 +334,20 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
             install, str(context.toolchain.patchelf), str(context.toolchain.readelf)
         )
 
+        # After every step that could have added or dropped one. The expectation
+        # is CPython's own: configure recorded what it built in the sysconfigdata
+        # this prefix ships, so nothing here has a list to keep up to date.
+        modules = check_shared_modules(install / Layout(python_mm, build.triple).stdlib)
+
         if source.retained is not None:
             _copy_retained_material(source.retained, build_root)
         test_harness = _install_test_harness(build_root)
         records = build_root / "records"
         write_json(records / "input.json", {"schema_version": 1, **source.record})
         if launcher_record is not None:
-            write_json(records / "launcher.json", {"schema_version": 1, **launcher_record})
+            write_json(
+                records / "launcher.json", {"schema_version": 1, **launcher_record}
+            )
         write_json(
             records / "mutations.json",
             {
@@ -328,6 +357,7 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
                 "pip_surface": pip,
                 "licenses": licenses,
                 "test_harness": test_harness,
+                "modules": modules,
             },
         )
         write_json(
@@ -394,13 +424,18 @@ def derive_install_only(context: BuildContext, full_archive: Path) -> dict[str, 
         source = tree / "python/install"
         if not source.is_dir():
             raise RuntimeError("full archive has no python/install/")
-        if not (tree / "python/PYTHON.json").is_file() or not (tree / "python/build").is_dir():
+        if (
+            not (tree / "python/PYTHON.json").is_file()
+            or not (tree / "python/build").is_dir()
+        ):
             raise RuntimeError("full archive is missing its full-only roots")
 
         python_root = workspace / "projection/python"
         copy_tree_contents(source, python_root)
         if (python_root / "PYTHON.json").exists() or (python_root / "build").exists():
-            raise RuntimeError("full-only metadata leaked into the install-only projection")
+            raise RuntimeError(
+                "full-only metadata leaked into the install-only projection"
+            )
 
         source_rows = tree_manifest(source)
         rows = write_tar_gz(python_root, artifact)
@@ -421,7 +456,9 @@ def derive_install_only(context: BuildContext, full_archive: Path) -> dict[str, 
     }
 
 
-def derive_stripped(context: BuildContext, install_only_archive: Path) -> dict[str, Any]:
+def derive_stripped(
+    context: BuildContext, install_only_archive: Path
+) -> dict[str, Any]:
     """Strip every eligible ELF in a verified install-only archive."""
     stem = install_only_archive.name.removesuffix("-install_only.tar.gz")
     artifact = context.output_dir / f"{stem}-install_only_stripped.tar.gz"
@@ -441,7 +478,9 @@ def derive_stripped(context: BuildContext, install_only_archive: Path) -> dict[s
         already_stripped: list[str] = []
         for path in elf_objects(python_root):
             rel = path.relative_to(python_root).as_posix()
-            record = strip_object(path, strip_tool=strip_tool, readelf=readelf, display_path=rel)
+            record = strip_object(
+                path, strip_tool=strip_tool, readelf=readelf, display_path=rel
+            )
             record["path"] = rel
             rows.append(record)
             if not record["changed"]:

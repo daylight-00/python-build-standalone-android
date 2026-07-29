@@ -52,7 +52,9 @@ def _passing_api_levels(directory: Path) -> dict[str, int]:
             continue
         if not (receipt.get("verdict") or {}).get("pass"):
             continue
-        level = ((receipt.get("checks") or {}).get("identity") or {}).get("android_api_level")
+        level = ((receipt.get("checks") or {}).get("identity") or {}).get(
+            "android_api_level"
+        )
         if level is not None:
             levels[path.stem] = int(level)
     return levels
@@ -123,7 +125,9 @@ def verify(
         for entry in [receipt["executed_artifact"], *receipt.get("bound_artifacts", [])]
     }
     missing = {
-        flavor: record for flavor, record in artifacts.items() if record["sha256"] not in covered
+        flavor: record
+        for flavor, record in artifacts.items()
+        if record["sha256"] not in covered
     }
     if missing:
         detail = "\n".join(
@@ -158,6 +162,7 @@ def verify(
             f"but {build.name} declares {build.android_api.level}"
         )
 
+    modules = _check_modules(checks, path)
     runtime_data = _check_runtime_data(build, checks, path)
 
     return {
@@ -166,17 +171,68 @@ def verify(
         "artifacts_covered": len(artifacts),
         "device": {
             key: device.get(key)
-            for key in ("model", "android_release", "api_level", "abi", "context", "page_size")
+            for key in (
+                "model",
+                "android_release",
+                "api_level",
+                "abi",
+                "context",
+                "page_size",
+            )
         },
         "interpreter": {
             key: identity.get(key)
-            for key in ("version", "soabi", "multiarch", "platform", "android_api_level")
+            for key in (
+                "version",
+                "soabi",
+                "multiarch",
+                "platform",
+                "android_api_level",
+            )
         },
         "runtime_data": runtime_data,
+        "modules": modules,
     }
 
 
-def _check_runtime_data(build: Build, checks: dict[str, Any], path: Path) -> dict[str, Any]:
+def _check_modules(checks: dict[str, Any], path: Path) -> dict[str, Any]:
+    """Every module CPython said it built has to import on the device.
+
+    The expectation is derived from the distribution's own sysconfigdata, so this
+    catches a module that stopped being built as well as one that fails to load —
+    an earlier probe imported whatever was in lib-dynload and could only see the
+    second.
+    """
+    observed = checks.get("extensions") or {}
+    if "expected" not in observed:
+        raise QualificationError(
+            f"{path} predates the derived module check. Re-run qualify.py so the receipt "
+            f"records every module CPython says it built, not only the ones that shipped."
+        )
+    if not observed.get("pass"):
+        raise QualificationError(
+            f"{path} could not probe modules: {observed.get('error')}"
+        )
+    failures = observed.get("failures") or {}
+    if failures:
+        detail = "\n  ".join(
+            f"{name}: {reason}" for name, reason in sorted(failures.items())
+        )
+        raise QualificationError(
+            f"{path} records modules that CPython built and the device could not import:\n"
+            f"  {detail}"
+        )
+    return {
+        "source": observed.get("source"),
+        "expected": len(observed.get("expected") or []),
+        "builtin": len(observed.get("builtin") or []),
+        "unavailable": sorted(observed.get("unavailable") or {}),
+    }
+
+
+def _check_runtime_data(
+    build: Build, checks: dict[str, Any], path: Path
+) -> dict[str, Any]:
     """Hold a build to what it claims about CA certificates and time zones.
 
     The device records what it found; which findings are acceptable depends on
@@ -193,7 +249,9 @@ def _check_runtime_data(build: Build, checks: dict[str, Any], path: Path) -> dic
             f"records what the distribution resolves for CA certificates and time zones."
         )
     if not observed.get("pass"):
-        raise QualificationError(f"{path} could not probe runtime data: {observed.get('error')}")
+        raise QualificationError(
+            f"{path} could not probe runtime data: {observed.get('error')}"
+        )
 
     zones = observed.get("zones") or {}
     summary = {
