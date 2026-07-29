@@ -1,0 +1,236 @@
+{
+  "bound_artifacts": [
+    {
+      "filename": "cpython-3.14.6+20260730-aarch64-linux-android-upstream-full.tar.zst",
+      "sha256": "bb9f4a7a8ea259d997fff8f9704aea13de0413068fbb097ebe19b2210599724a",
+      "size_bytes": 39421207
+    },
+    {
+      "filename": "cpython-3.14.6+20260730-aarch64-linux-android-upstream-install_only.tar.gz",
+      "sha256": "f4212cb123ce9ba1b029ad558bec8ee6bdf6befb6ea20d2a7610d377b46d1325",
+      "size_bytes": 23855348
+    }
+  ],
+  "checks": {
+    "dlopen": {
+      "engines-3/afalg.so": "pass",
+      "engines-3/capi.so": "pass",
+      "engines-3/loader_attic.so": "pass",
+      "engines-3/padlock.so": "pass",
+      "libcrypto.so": "pass",
+      "libcrypto_python.so": "pass",
+      "libpython3.14.so": "pass",
+      "libpython3.so": "pass",
+      "libsqlite3.so": "pass",
+      "libsqlite3_python.so": "pass",
+      "libssl.so": "pass",
+      "libssl_python.so": "pass",
+      "ossl-modules/legacy.so": "pass",
+      "pass": true
+    },
+    "extensions": {
+      "builtin": [
+        "_datetime",
+        "_io",
+        "_types",
+        "_typing",
+        "pwd",
+        "time"
+      ],
+      "count": 73,
+      "expected": [
+        "_asyncio",
+        "_bisect",
+        "_blake2",
+        "_bz2",
+        "_codecs_cn",
+        "_codecs_hk",
+        "_codecs_iso2022",
+        "_codecs_jp",
+        "_codecs_kr",
+        "_codecs_tw",
+        "_csv",
+        "_ctypes",
+        "_ctypes_test",
+        "_datetime",
+        "_decimal",
+        "_elementtree",
+        "_hashlib",
+        "_heapq",
+        "_hmac",
+        "_interpchannels",
+        "_interpqueues",
+        "_interpreters",
+        "_io",
+        "_json",
+        "_lsprof",
+        "_lzma",
+        "_md5",
+        "_multibytecodec",
+        "_pickle",
+        "_posixsubprocess",
+        "_queue",
+        "_random",
+        "_remote_debugging",
+        "_sha1",
+        "_sha2",
+        "_sha3",
+        "_socket",
+        "_sqlite3",
+        "_ssl",
+        "_statistics",
+        "_struct",
+        "_testbuffer",
+        "_testcapi",
+        "_testclinic",
+        "_testclinic_limited",
+        "_testimportmultiple",
+        "_testinternalcapi",
+        "_testlimitedcapi",
+        "_testmultiphase",
+        "_testsinglephase",
+        "_types",
+        "_typing",
+        "_xxtestfuzz",
+        "_zoneinfo",
+        "_zstd",
+        "array",
+        "binascii",
+        "cmath",
+        "fcntl",
+        "math",
+        "mmap",
+        "pwd",
+        "pyexpat",
+        "resource",
+        "select",
+        "syslog",
+        "termios",
+        "time",
+        "unicodedata",
+        "xxlimited",
+        "xxlimited_35",
+        "xxsubtype",
+        "zlib"
+      ],
+      "failures": {},
+      "pass": true,
+      "source": "sysconfigdata",
+      "unavailable": {
+        "_curses": "missing",
+        "_curses_panel": "missing",
+        "_dbm": "missing",
+        "_gdbm": "missing",
+        "_multiprocessing": "missing",
+        "_posixshmem": "missing",
+        "_scproxy": "n/a",
+        "_tkinter": "missing",
+        "_uuid": "missing",
+        "grp": "missing",
+        "readline": "missing"
+      }
+    },
+    "identity": {
+      "android_api_level": 24,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/runtime/python/bin/python3.14",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": true,
+      "platform": "android-24-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/runtime/python",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    },
+    "ld_library_path_required": {
+      "pass": true
+    },
+    "pip": {
+      "pass": true,
+      "stderr": "",
+      "stdout": "pip 26.1.2 from /data/data/com.termux/files/usr/tmp/qualify-wx380xsp/runtime/python/lib/python3.14/site-packages/pip (python 3.14)"
+    },
+    "relocated_identity": {
+      "android_api_level": 24,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/relocated/a/deeper/path/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/relocated/a/deeper/path/python/bin/python3.14",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": true,
+      "platform": "android-24-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/relocated/a/deeper/path/python",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    },
+    "runtime_data": {
+      "ca_certificate_count": 0,
+      "ca_error": null,
+      "openssl_cafile": "/usr/local/ssl/cert.pem",
+      "openssl_cafile_present": false,
+      "openssl_capath": "/usr/local/ssl/certs",
+      "openssl_capath_present": false,
+      "pass": true,
+      "tzpath_configured": "/usr/share/zoneinfo:/usr/lib/zoneinfo:/usr/share/lib/zoneinfo:/etc/zoneinfo",
+      "tzpath_present": [],
+      "tzpath_runtime": [
+        "/usr/share/zoneinfo",
+        "/usr/lib/zoneinfo",
+        "/usr/share/lib/zoneinfo",
+        "/etc/zoneinfo"
+      ],
+      "zones": {
+        "America/New_York": "ZoneInfoNotFoundError: 'No time zone found with key America/New_York'",
+        "Asia/Seoul": "ZoneInfoNotFoundError: 'No time zone found with key Asia/Seoul'"
+      }
+    },
+    "subprocess": {
+      "pass": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/runtime/python"
+    },
+    "venv": {
+      "pass": true,
+      "stderr": "",
+      "stdout": ""
+    },
+    "venv_identity": {
+      "android_api_level": 24,
+      "base_prefix": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/runtime/python",
+      "executable": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/state/venv/bin/python",
+      "ext_suffix": ".cpython-314-aarch64-linux-android.so",
+      "multiarch": "aarch64-linux-android",
+      "pass": true,
+      "paths_within_prefix": false,
+      "platform": "android-24-arm64_v8a",
+      "prefix": "/data/data/com.termux/files/usr/tmp/qualify-wx380xsp/state/venv",
+      "soabi": "cpython-314-aarch64-linux-android",
+      "version": "3.14.6"
+    }
+  },
+  "device": {
+    "abi": "arm64-v8a",
+    "android_release": "16",
+    "api_level": "36",
+    "context": "termux",
+    "machine": "aarch64",
+    "model": "SM-S908N",
+    "page_size": 4096
+  },
+  "executed_artifact": {
+    "filename": "cpython-3.14.6+20260730-aarch64-linux-android-upstream-install_only_stripped.tar.gz",
+    "sha256": "67e71fa07dcd364c7942694247eb8c1a54757f7fe7f1b2edae8608f0a5cc6580",
+    "size_bytes": 23848253
+  },
+  "expectations": {
+    "builtin_runtime_data": false
+  },
+  "receipt_kind": "android-device-qualification",
+  "schema_version": 1,
+  "verdict": {
+    "failures": [],
+    "pass": true
+  }
+}
