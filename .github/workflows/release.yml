@@ -63,13 +63,14 @@ jobs:
         with:
           enable-cache: true
 
-      - run: uv sync
-
+      # No project sync: the script declares its dependency inline, so answering
+      # one question does not cost an environment build.
+      #
       # Assigned to a variable first: `echo "x=$(cmd)"` reports echo's exit
       # status, so a failing cmd would leave an empty output and a green step.
       - id: resolve
         run: |
-          builds=$(uv run ./ci-matrix.py)
+          builds=$(uv run --script ./ci-matrix.py)
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
           echo "$builds"
 
@@ -119,6 +120,12 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
         run: uv run ./build.py --target ${{ matrix.build }} --tag "$TAG"
+
+      # The guards inside the build have already run; this asks the same
+      # questions of the bytes that would be published, which is the only form a
+      # consumer ever sees.
+      - name: Validate the archives
+        run: uv run ./validate-distribution.py dist/*.tar.zst dist/*.tar.gz
 
       # The second build deliberately uses a different umask: repeating a build
       # under identical conditions would not have caught the directory and

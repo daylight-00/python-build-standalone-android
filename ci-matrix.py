@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pyyaml"]
+# ///
 """Emit the CI build matrix from ``ci-targets.yaml``.
 
     ./ci-matrix.py
@@ -7,9 +11,13 @@ GitHub Actions cannot read the target table, so each workflow used to carry its
 own copy of the list of builds — two copies, which is one more than the number
 of places that can be right. Adding ``extended`` meant editing both by hand.
 
-Upstream generates its matrix the same way, from the same file. It parses the
-YAML directly; this reads it through ``pythonbuild.targets`` instead, so the rule
-that the flagship carries no marker in an artifact name is stated once.
+Upstream generates its matrix from the same file and declares its dependencies
+inline so the script runs without the project installed; the matrix job should
+not need a full sync to answer one question. This does the same, and still reads
+the table through ``pythonbuild.targets`` rather than parsing the YAML again —
+the script sits at the repository root, so the package is importable without
+being installed, and the rule that the flagship carries no marker in an artifact
+name stays stated once.
 """
 
 from __future__ import annotations
