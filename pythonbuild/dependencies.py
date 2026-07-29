@@ -32,7 +32,7 @@ from .downloads import acquire
 from .elf import android_note, elf_objects
 from .targets import ROOT
 from .toolchain import pkg_config_identity
-from .utils import file_identity, read_json_object, run_checked, sha256_path
+from .utils import file_identity, read_json_object, run_checked, run_logged, sha256_path
 
 RECIPE_LOCK = ROOT / "config/source/dependency-recipes.lock.json"
 
@@ -342,7 +342,7 @@ def build_dependencies(
         download_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, download_dir / component["source"]["filename"])
 
-        run_checked(
+        run_logged(
             [
                 str(repo / "build.sh"),
                 name,

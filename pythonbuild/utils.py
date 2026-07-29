@@ -9,6 +9,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .logging import log, log_raw
+
 CHUNK = 1024 * 1024
 
 # Callers include workflow one-liners, which naturally pass a string.
@@ -56,6 +58,33 @@ def run_checked(command: list[str], what: str, **kwargs: Any) -> subprocess.Comp
     if result.returncode:
         raise RuntimeError(f"{what} failed: {result.stderr.strip() or result.stdout.strip()}")
     return result
+
+
+def run_logged(command: list[str], what: str, **kwargs: Any) -> None:
+    """Run a command that takes minutes to hours, streaming its output.
+
+    ``run`` captures, which is right for a tool being asked a question and wrong
+    for a build. Captured, a three-hour ``make`` prints nothing until it is over,
+    a hang looks exactly like progress, and the whole transcript is held in
+    memory to be thrown away on success.
+
+    stderr is folded into stdout so the two stay in the order they were written.
+    """
+    log(f"{what}")
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        **kwargs,
+    )
+    with process:
+        assert process.stdout is not None
+        for line in process.stdout:
+            log_raw(line)
+    if process.returncode:
+        raise RuntimeError(f"{what} failed with exit status {process.returncode}")
 
 
 def file_identity(path: Path) -> dict[str, Any]:

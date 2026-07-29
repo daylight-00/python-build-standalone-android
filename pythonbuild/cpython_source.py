@@ -25,7 +25,7 @@ from .downloads import acquire
 from .elf import android_note, elf_objects
 from .targets import Build
 from .toolchain import Toolchain, pkg_config_identity, pkg_config_shim
-from .utils import file_identity, read_json_object, run_checked
+from .utils import file_identity, read_json_object, run_logged
 
 ANDROID_DRIVER = "Android/android.py"
 
@@ -40,7 +40,7 @@ def _extract_source(archive: Path, destination: Path) -> Path:
 
 
 def _driver(source: Path, cross_build: Path, environment: dict[str, str], *args: str) -> None:
-    run_checked(
+    run_logged(
         [sys.executable, str(source / ANDROID_DRIVER), *args],
         f"android.py {args[0]}",
         cwd=source,

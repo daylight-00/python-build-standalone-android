@@ -27,6 +27,7 @@ from pythonbuild.assemble import (
 )
 from pythonbuild.cpython_source import prepare_source_prefix
 from pythonbuild.downloads import DEFAULT_CACHE, acquire
+from pythonbuild.logging import log
 from pythonbuild.targets import get_build, load_builds
 from pythonbuild.toolchain import resolve_toolchain
 from pythonbuild.utils import write_json
@@ -73,40 +74,40 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output_dir.resolve(),
     )
 
-    print(f"==> {build.name}, minimum Android API {build.android_api.level}", flush=True)
+    log(f"{build.name}, minimum Android API {build.android_api.level}")
 
     if build.from_upstream_prebuilt:
         with tempfile.TemporaryDirectory(prefix="pbsa-input-") as tmp:
-            print("==> acquiring the pinned input", flush=True)
+            log("acquiring the pinned input")
             upstream = acquire(context.lock["archive"], args.cache, what="official Android package")
             source = prepare_upstream_prefix(context, upstream, Path(tmp))
-            print("==> assembling full", flush=True)
+            log("assembling full")
             full = assemble_full(context, source)
     else:
-        print("==> building the dependencies and CPython from source", flush=True)
+        log("building the dependencies and CPython from source")
         source = prepare_source_prefix(
             build=build,
             toolchain=context.toolchain,
             workspace=args.build_dir.resolve() / build.artifact_infix,
             cache=args.cache,
         )
-        print("==> assembling full", flush=True)
+        log("assembling full")
         full = assemble_full(context, source)
     full_archive = context.output_dir / full["artifact"]["filename"]
 
-    print("==> deriving install_only", flush=True)
+    log("deriving install_only")
     install_only = derive_install_only(context, full_archive)
     install_only_archive = context.output_dir / install_only["artifact"]["filename"]
 
-    print("==> deriving install_only_stripped", flush=True)
+    log("deriving install_only_stripped")
     stripped = derive_stripped(context, install_only_archive)
     stripped_archive = context.output_dir / stripped["artifact"]["filename"]
 
     checks: dict[str, object] = {}
     if not args.skip_verify:
-        print("==> verifying install_only is an exact projection of full", flush=True)
+        log("verifying install_only is an exact projection of full")
         checks["projection"] = verify_projection(full_archive, install_only_archive)
-        print("==> verifying the stripped flavor only changed ELF payloads", flush=True)
+        log("verifying the stripped flavor only changed ELF payloads")
         checks["stripped"] = stripped_shares_non_elf_bytes(install_only_archive, stripped_archive)
 
     receipt = {
