@@ -27,6 +27,52 @@ def receipt_path(build: Build, tag: str, root: Path = QUALIFICATION_ROOT) -> Pat
     return root / tag / f"{build.artifact_infix}.json"
 
 
+def _passing_api_levels(directory: Path) -> dict[str, int]:
+    """The API level each passing receipt in ``directory`` recorded, by artifact infix."""
+    levels: dict[str, int] = {}
+    for path in sorted(directory.glob("*.json")):
+        try:
+            receipt = read_json_object(path)
+        except (OSError, ValueError):
+            continue
+        if receipt.get("receipt_kind") != "android-device-qualification":
+            continue
+        if not (receipt.get("verdict") or {}).get("pass"):
+            continue
+        level = ((receipt.get("checks") or {}).get("identity") or {}).get("android_api_level")
+        if level is not None:
+            levels[path.stem] = int(level)
+    return levels
+
+
+def shipped_api_levels(tag: str, root: Path = QUALIFICATION_ROOT) -> dict[str, int]:
+    """The API floor each build shipped with at ``tag``, keyed by artifact infix.
+
+    Read out of the committed receipts rather than kept in a table of its own.
+    ``verify`` refuses a release whose interpreter did not report the floor the
+    build declares, so a passing receipt records the floor that tag shipped —
+    which makes the receipts the repository's own per-tag history of where each
+    floor stood, derived rather than transcribed.
+    """
+    directory = root / tag
+    return _passing_api_levels(directory) if directory.is_dir() else {}
+
+
+def previous_qualified_tag(tag: str, root: Path = QUALIFICATION_ROOT) -> str | None:
+    """The newest tag before ``tag`` that carries a passing receipt.
+
+    Tags are ``YYYYMMDD``, so ordering them as strings orders them by date.
+    """
+    if not root.is_dir():
+        return None
+    earlier = [
+        path.name
+        for path in root.iterdir()
+        if path.is_dir() and path.name < tag and _passing_api_levels(path)
+    ]
+    return max(earlier, default=None)
+
+
 class QualificationError(RuntimeError):
     """The release must not proceed."""
 
