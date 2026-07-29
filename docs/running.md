@@ -14,6 +14,16 @@ three archive flavors:
 Most consumers want `install_only_stripped`. Reach for `full` when you need the
 metadata, the retained upstream input, or the mutation and audit records.
 
+An archive can be held to the distribution contract before it is used:
+
+```console
+$ ./validate-distribution.py cpython-3.14.6+<tag>-…-install_only.tar.gz
+```
+
+That checks the metadata against the schema upstream's own reader enforces, the
+extension modules against what CPython says it built, the licence texts against
+the manifest, and the member paths. It needs only this repository, not a build.
+
 Machines can resolve the newest release from the `latest-release` branch:
 
 ```
@@ -40,13 +50,18 @@ two Android builds apart:
 ```console
 $ uv python install cpython-3.14.6-linux-aarch64-none \
     --python-downloads-json-url \
-    https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/latest-release/download-metadata-upstream.json
+    https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/latest-release/download-metadata.json
 ```
 
 ```
 download-metadata.json            the flagship build
 download-metadata-upstream.json   the baseline build
 ```
+
+The catalogs resolve to the newest **device-qualified** release. A release
+published without a device receipt is marked as a prerelease and deliberately
+left out of them, so `uv python install` never lands on bytes no device ran —
+see [releasing without one](technotes.md#releasing-without-one).
 
 The same URL works through `UV_PYTHON_DOWNLOADS_JSON_URL` or the
 `python-downloads-json-url` key in `uv.toml`.

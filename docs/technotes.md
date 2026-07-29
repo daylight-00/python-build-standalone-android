@@ -217,6 +217,30 @@ than its `install_only`, where the upstream-derived pair differ by a few
 kilobytes — the official package arrives already stripped, so for that build the
 stripped flavor is close to a formality.
 
+## What a build must carry
+
+Upstream keeps a hand-written table of the extension modules it expects and
+validates every distribution against it. A table like that has to be edited
+whenever CPython changes, and this project leaves that class of decision to
+python.org — as it does the dependency set and the `upstream` API floor.
+
+So the expectation is derived from the one place that already knows. CPython's
+`configure` records its per-module decision in the `sysconfigdata` the
+distribution ships, and the two halves of the check read it:
+
+```
+build    every module built as a shared object is in the distribution, and no other
+device   every module configure said it built imports, builtins included
+```
+
+Neither half has a list to keep up to date, and an `extended` build is held to
+readline and Tk the moment `configure` says `yes` to them.
+
+The first half is what a probe over `lib-dynload` cannot do. Importing whatever
+shipped proves that what shipped works; it cannot notice a module that stopped
+being built, which is how a distribution silently loses `_ssl`. The gate refuses
+a receipt that predates the derived probe for the same reason.
+
 ## Following upstream
 
 Only CPython's version is watched. Everything else follows from whichever version
@@ -277,17 +301,16 @@ move it; the notes are where that becomes visible.
 CI has no Android runner, so the check that matters most — does this actually
 run? — cannot happen there. `qualify.py` runs on a device against a built
 archive and writes a receipt recording what it found: interpreter identity,
-every extension module imported, every shared library `dlopen`ed, a subprocess
-spawned, `pip` and `venv` exercised, and the whole prefix copied to a deeper path
-and re-checked. It uses only the standard library, because a device is not
+every module `configure` said it built importing, every shared library
+`dlopen`ed, a subprocess spawned, `pip` and `venv` exercised, and the whole
+prefix copied to a deeper path and re-checked. It uses only the standard library, because a device is not
 guaranteed to have anything else, and it never raises: a probe that cannot even
 start is recorded as a failure rather than losing the receipt.
 
 Receipts are committed under `qualification/<tag>/cpython-<version>-<build>.json`
 — named after the artifact stem, so a directory says which Python each receipt
-qualified without opening it — and the release
-workflow refuses to publish unless one covers **every artifact in the release by
-SHA-256**. A receipt is evidence only for the bytes it names, so one produced
+qualified without opening it — and the release workflow refuses to publish unless
+one covers **every artifact in the release by SHA-256**. A receipt is evidence only for the bytes it names, so one produced
 against an earlier build cannot be carried forward silently. The gate also
 checks that the device's ABI is one this project releases for and that the
 interpreter reported the API level the build declares.

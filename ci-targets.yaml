@@ -10,6 +10,12 @@
 #
 # Each build option is a separately releasable build. `default` is the flagship
 # and carries no marker in artifact names.
+#
+# The API level below is declared rather than derived, but it is not argued: the
+# rule each policy names is measured by `./resolve-api-level.py`, and a weekly
+# workflow fails when a declaration here has gone stale. The Python version is
+# not declared at all — it comes from the input lock, which names it in its path
+# and again in its contents.
 
 android:
   aarch64-linux-android:

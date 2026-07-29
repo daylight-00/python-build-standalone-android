@@ -18,35 +18,52 @@ on it, though: the gate finds a receipt by the artifact it records having run
 against, not by its filename, so a receipt cannot claim a build by being named
 after one.
 
+A tag here may hold receipts for a candidate that was never released. The
+receipts bind bytes, not names, so they stay valid for whatever tag those bytes
+are eventually published under — the release tag does not reach inside an
+archive.
+
 ## Producing one
 
 Build the release candidate, then copy `qualify.py` and the archives to the
 device:
 
 ```console
-$ ./build.py --target aarch64-linux-android:upstream --tag 20260727
+$ ./build.py --target aarch64-linux-android --tag 20260730
+$ ./build.py --target aarch64-linux-android:upstream --tag 20260730
 ```
 
-On the device, in Termux:
+On the device, in Termux — one run per build. The flagship compiles its trust
+store in, so it is asked to resolve it with nothing set; the baseline gets its
+certificates from the data track and is not:
 
 ```console
 $ python3 qualify.py \
-    cpython-3.14.6+20260727-aarch64-linux-android-upstream-install_only_stripped.tar.gz \
+    cpython-3.14.6+20260730-aarch64-linux-android-install_only_stripped.tar.gz \
     --also-binds \
-        cpython-3.14.6+20260727-aarch64-linux-android-upstream-full.tar.zst \
-        cpython-3.14.6+20260727-aarch64-linux-android-upstream-install_only.tar.gz \
+        cpython-3.14.6+20260730-aarch64-linux-android-full.tar.zst \
+        cpython-3.14.6+20260730-aarch64-linux-android-install_only.tar.gz \
+    --expected-api 34 --builtin-runtime-data \
+    -o cpython-3.14.6-aarch64-linux-android.json
+
+$ python3 qualify.py \
+    cpython-3.14.6+20260730-aarch64-linux-android-upstream-install_only_stripped.tar.gz \
+    --also-binds \
+        cpython-3.14.6+20260730-aarch64-linux-android-upstream-full.tar.zst \
+        cpython-3.14.6+20260730-aarch64-linux-android-upstream-install_only.tar.gz \
     --expected-api 24 \
-    -o aarch64-linux-android-upstream.json
+    -o cpython-3.14.6-aarch64-linux-android-upstream.json
 ```
 
 `qualify.py` needs only the standard library. The archive named first is the one
 actually executed — use the flavor the uv catalog points at. The others are
 bound by hash so the gate can confirm the whole release was covered.
 
-Commit the receipt under the release tag, then check it from the repository:
+Commit the receipts under the release tag, then check them from the repository:
 
 ```console
-$ ./check-qualification.py --target aarch64-linux-android:upstream --tag 20260727
+$ ./check-qualification.py --target aarch64-linux-android --tag 20260730
+$ ./check-qualification.py --target aarch64-linux-android:upstream --tag 20260730
 ```
 
 ## What it checks
@@ -54,7 +71,7 @@ $ ./check-qualification.py --target aarch64-linux-android:upstream --tag 2026072
 | Check | What a failure would mean |
 | --- | --- |
 | interpreter identity | wrong version, ABI, or platform for this build |
-| extension modules | an extension the archive ships cannot be imported |
+| extension modules | a module `configure` said it built is missing or will not import |
 | `dlopen` of shared libraries | the relative `RUNPATH` does not resolve |
 | subprocess | the interpreter cannot re-exec itself |
 | relocation | the prefix stops working when moved |

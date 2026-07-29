@@ -26,6 +26,30 @@ one `python/` root with deterministic ordering, normalized ownership and
 timestamps, no absolute or traversal paths, no hard links, and only relative
 non-escaping symlinks.
 
+### The extension modules
+
+A distribution carries exactly the extension modules CPython decided to build,
+and the archive says which those are without being asked to be trusted about it.
+`configure` records its per-module decision in the `sysconfigdata` every
+distribution ships:
+
+```
+MODULE_<NAME>_STATE   yes | missing | disabled | n/a
+MODSHARED_NAMES       the modules built as shared objects
+MODBUILT_NAMES        the modules linked into the interpreter
+```
+
+So the set is checkable from the bytes alone, which is what
+`validate-distribution.py` does: every module `MODSHARED_NAMES` names must be in
+`lib-dynload`, and nothing else may be. Measured on both builds, that is 68
+shared objects for the flagship and 67 for the baseline — they differ by `grp` —
+with six more linked into the interpreter in each.
+
+What a shared object cannot show is whether it loads. That half needs a device,
+and the qualification receipt records every module `configure` said it built
+importing there, builtins included. See
+[the device qualification gate](technotes.md#the-device-qualification-gate).
+
 ### Reproducibility
 
 Two builds of the same input produce byte-identical archives, on any host. Each

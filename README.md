@@ -15,13 +15,17 @@ Install a distribution with `uv`:
 ```console
 $ uv python install cpython-3.14.6-linux-aarch64-none \
     --python-downloads-json-url \
-    https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/latest-release/download-metadata-upstream.json
+    https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/latest-release/download-metadata.json
 ```
+
+That is the flagship build, which needs Android 14. For wider device coverage
+substitute `download-metadata-upstream.json`, the baseline, which needs Android 7
+and is slower — see [Choosing a build](docs/running.md#choosing-a-build).
 
 Or download an archive from the [releases page][releases] and extract it:
 
 ```console
-$ tar -xzf cpython-3.14.6+<tag>-aarch64-linux-android-upstream-install_only.tar.gz
+$ tar -xzf cpython-3.14.6+<tag>-aarch64-linux-android-install_only.tar.gz
 $ ./python/bin/python3
 ```
 
