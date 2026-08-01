@@ -99,7 +99,119 @@ print(json.dumps(results))
 # environment set. A build that compiles these paths in should work as it stands;
 # one that expects an external data product should not, and saying which is the
 # gate's job rather than this probe's.
-RUNTIME_DATA_PROBE = """
+CA_VERIFY_HELPER = r"""
+import ctypes, ctypes.util, pathlib, re, sys
+
+
+def _default_ca_verification(capath):
+    # Verify a certificate through OpenSSL's default store, including lazy capaths.
+    if not capath or not pathlib.Path(capath).is_dir():
+        return {"pass": False, "error": "default CA directory is absent", "attempted": 0}
+    candidates = [
+        path
+        for path in sorted(pathlib.Path(capath).iterdir())
+        if re.fullmatch(r"[0-9a-fA-F]{8}\.[0-9]+", path.name)
+    ]
+    library = pathlib.Path(sys.prefix) / "lib/libcrypto_python.so"
+    library_name = str(library) if library.is_file() else ctypes.util.find_library("crypto")
+    if not library_name:
+        return {"pass": False, "error": "libcrypto could not be located", "attempted": 0}
+    try:
+        crypto = ctypes.CDLL(library_name)
+        crypto.BIO_new_mem_buf.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        crypto.BIO_new_mem_buf.restype = ctypes.c_void_p
+        crypto.BIO_free.argtypes = [ctypes.c_void_p]
+        crypto.PEM_read_bio_X509.argtypes = [
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p
+        ]
+        crypto.PEM_read_bio_X509.restype = ctypes.c_void_p
+        crypto.X509_free.argtypes = [ctypes.c_void_p]
+        crypto.X509_STORE_new.restype = ctypes.c_void_p
+        crypto.X509_STORE_free.argtypes = [ctypes.c_void_p]
+        crypto.X509_STORE_set_default_paths.argtypes = [ctypes.c_void_p]
+        crypto.X509_STORE_set_default_paths.restype = ctypes.c_int
+        crypto.X509_STORE_CTX_new.restype = ctypes.c_void_p
+        crypto.X509_STORE_CTX_free.argtypes = [ctypes.c_void_p]
+        crypto.X509_STORE_CTX_init.argtypes = [
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p
+        ]
+        crypto.X509_STORE_CTX_init.restype = ctypes.c_int
+        crypto.X509_verify_cert.argtypes = [ctypes.c_void_p]
+        crypto.X509_verify_cert.restype = ctypes.c_int
+        crypto.X509_STORE_CTX_get_error.argtypes = [ctypes.c_void_p]
+        crypto.X509_STORE_CTX_get_error.restype = ctypes.c_int
+        crypto.X509_verify_cert_error_string.argtypes = [ctypes.c_long]
+        crypto.X509_verify_cert_error_string.restype = ctypes.c_char_p
+    except Exception as error:
+        return {
+            "pass": False,
+            "error": f"libcrypto interface unavailable: {type(error).__name__}: {error}",
+            "attempted": 0,
+        }
+
+    store = crypto.X509_STORE_new()
+    if not store:
+        return {"pass": False, "error": "X509_STORE_new failed", "attempted": 0}
+    attempted = 0
+    last_error = "no hash-named CA certificates"
+    verified = None
+    try:
+        if crypto.X509_STORE_set_default_paths(store) != 1:
+            return {
+                "pass": False,
+                "error": "X509_STORE_set_default_paths failed",
+                "attempted": 0,
+            }
+        for path in candidates:
+            attempted += 1
+            data = path.read_bytes()
+            buffer = ctypes.create_string_buffer(data)
+            bio = crypto.BIO_new_mem_buf(buffer, len(data))
+            if not bio:
+                last_error = f"BIO_new_mem_buf failed for {path.name}"
+                continue
+            cert = None
+            try:
+                cert = crypto.PEM_read_bio_X509(bio, None, None, None)
+            finally:
+                crypto.BIO_free(bio)
+            if not cert:
+                last_error = f"PEM_read_bio_X509 failed for {path.name}"
+                continue
+            ctx = crypto.X509_STORE_CTX_new()
+            if not ctx:
+                crypto.X509_free(cert)
+                last_error = "X509_STORE_CTX_new failed"
+                continue
+            try:
+                if crypto.X509_STORE_CTX_init(ctx, store, cert, None) != 1:
+                    last_error = f"X509_STORE_CTX_init failed for {path.name}"
+                    continue
+                if crypto.X509_verify_cert(ctx) == 1:
+                    verified = path.name
+                    break
+                code = crypto.X509_STORE_CTX_get_error(ctx)
+                message = crypto.X509_verify_cert_error_string(code)
+                last_error = (
+                    message.decode("utf-8", "replace")
+                    if message
+                    else f"verification error {code}"
+                )
+            finally:
+                crypto.X509_STORE_CTX_free(ctx)
+                crypto.X509_free(cert)
+    finally:
+        crypto.X509_STORE_free(store)
+    return {
+        "pass": verified is not None,
+        "verified_certificate": verified,
+        "attempted": attempted,
+        "candidate_count": len(candidates),
+        "error": None if verified is not None else last_error,
+    }
+"""
+
+RUNTIME_DATA_PROBE = CA_VERIFY_HELPER + r"""
 import json, os, ssl, sysconfig, zoneinfo
 paths = ssl.get_default_verify_paths()
 try:
@@ -107,6 +219,7 @@ try:
     ca_error = None
 except Exception as error:
     certs, ca_error = 0, f"{type(error).__name__}: {error}"
+ca_default_verify = _default_ca_verification(paths.openssl_capath)
 zones = {}
 for key in ("Asia/Seoul", "America/New_York"):
     try:
@@ -125,7 +238,12 @@ print(json.dumps({
     "openssl_capath": paths.openssl_capath,
     "openssl_capath_present": bool(paths.openssl_capath)
         and os.path.isdir(paths.openssl_capath),
+    # Hash-directory certificates are loaded lazily by OpenSSL, so this count can
+    # legitimately be zero before a verification. The offline verification above
+    # is the authoritative result for a capath-only trust store.
     "ca_certificate_count": certs,
+    "ca_default_verify": ca_default_verify,
+    "ca_default_verify_pass": ca_default_verify["pass"],
     "ca_error": ca_error,
 }))
 """
@@ -322,8 +440,11 @@ def evaluate(
     runtime_data = checks.get("runtime_data", {})
     if not runtime_data.get("pass"):
         failures.append("runtime_data")
-    elif builtin_runtime_data and not runtime_data.get("ca_certificate_count"):
-        failures.append("builtin-ca-empty")
+    elif builtin_runtime_data and not (
+        runtime_data.get("ca_certificate_count")
+        or runtime_data.get("ca_default_verify_pass")
+    ):
+        failures.append("builtin-ca-unverified")
 
     return {"pass": not failures, "failures": sorted(set(failures))}
 

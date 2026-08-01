@@ -6,7 +6,7 @@
     "repository": "https://github.com/beeware/cpython-android-source-deps",
     "commit": "f4c94a0",
     "driver": "build.sh <name> <version> <build> <host>",
-    "single_revision_rationale": "Every component is built from one recipe revision rather than from the tag that produced its published binary. Those tags are not contemporaneous: the older ones read the API level from a lowercase api_level variable that a caller setting ANDROID_API_LEVEL does not reach, and they pin different NDK revisions. Mixing them silently produced a dependency set at two different API levels. Since this build deliberately does not reproduce the published binaries — it changes the API level and OpenSSL's openssldir — matching each historical recipe matters less than the whole set being built the same way."
+    "single_revision_rationale": "Every component is built from one recipe revision rather than from the tag that produced its published binary. Those tags are not contemporaneous: the older ones read the API level from a lowercase api_level variable that a caller setting ANDROID_API_LEVEL does not reach, and they pin different NDK revisions. Mixing them silently produced a dependency set at two different API levels. Since this build deliberately does not reproduce the published binaries \u2014 it changes the API level and OpenSSL's openssldir \u2014 matching each historical recipe matters less than the whole set being built the same way."
   },
   "overrides": [
     {
@@ -14,6 +14,12 @@
       "target": "android-env.sh",
       "change": "ndk_version 27.2.12479018 -> 27.3.13750724",
       "reason": "the recipes pin the NDK one revision behind the one CPython pins; building the dependencies and the interpreter with different toolchains is a difference nobody chose"
+    },
+    {
+      "id": "single-ndk-prebuilt",
+      "target": "android-env.sh",
+      "change": "derive the prebuilt root from the target clang selected on PATH instead of expanding prebuilt/*",
+      "reason": "an SDK can contain multiple prebuilt directories; wildcard expansion joins them into an invalid tool path, while the product toolchain has already selected one compatible compiler"
     },
     {
       "id": "openssl-ca-path",

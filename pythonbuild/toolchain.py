@@ -52,8 +52,12 @@ class Toolchain:
     clang: Path
     readelf: Path
     strip: Path
+    lld: Path
+    lld_version: str
+    lld_source: str
     patchelf: Path
     patchelf_version: str
+    patchelf_source: str
 
     @property
     def sdk_root(self) -> Path:
@@ -82,7 +86,11 @@ class Toolchain:
             "compiler_version": version[0] if version else "",
             "readelf": self.readelf.name,
             "strip": self.strip.name,
+            "lld": self.lld.name,
+            "lld_version": self.lld_version,
+            "lld_source": self.lld_source,
             "patchelf_version": self.patchelf_version,
+            "patchelf_source": self.patchelf_source,
             "zstandard": zstandard.__version__,
             "libzstd": ".".join(str(part) for part in zstandard.ZSTD_VERSION),
         }
@@ -161,7 +169,50 @@ def _llvm_bin(ndk: Path) -> Path:
     return hosts[0] / "bin"
 
 
-def resolve_patchelf(lock: dict[str, Any], cache: Path = DEFAULT_CACHE) -> Path:
+def _validate_lld(path: Path) -> str:
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise RuntimeError(f"LLD is not an executable file: {path}")
+    version_lines = run([str(path), "--version"]).stdout.splitlines()
+    if not version_lines or not version_lines[0].strip():
+        raise RuntimeError(f"cannot determine LLD version from: {path}")
+    return version_lines[0].strip()
+
+
+def resolve_lld(bindir: Path) -> tuple[Path, str, str]:
+    override = os.environ.get("PBSA_LLD")
+    if override:
+        installed = Path(override).expanduser()
+        if not installed.is_absolute():
+            raise RuntimeError("PBSA_LLD must be an absolute path")
+        return installed, _validate_lld(installed), "environment-override"
+
+    installed = bindir / "ld.lld"
+    return installed, _validate_lld(installed), "ndk-prebuilt"
+
+
+def _validate_patchelf(path: Path) -> str:
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise RuntimeError(f"patchelf is not an executable file: {path}")
+    help_text = run([str(path), "--help"])
+    if "--page-size" not in (help_text.stdout + help_text.stderr):
+        raise RuntimeError(f"patchelf at {path} lacks --page-size support")
+    version_text = run([str(path), "--version"]).stdout.strip()
+    prefix = "patchelf "
+    if not version_text.startswith(prefix) or not version_text[len(prefix) :]:
+        raise RuntimeError(f"cannot determine patchelf version from: {version_text!r}")
+    return version_text[len(prefix) :]
+
+
+def resolve_patchelf(
+    lock: dict[str, Any], cache: Path = DEFAULT_CACHE
+) -> tuple[Path, str, str]:
+    override = os.environ.get("PBSA_PATCHELF")
+    if override:
+        installed = Path(override).expanduser()
+        if not installed.is_absolute():
+            raise RuntimeError("PBSA_PATCHELF must be an absolute path")
+        return installed, _validate_patchelf(installed), "environment-override"
+
     section = lock["patchelf"]
     installed = cache / f"patchelf-{section['version']}" / str(section["binary_path"])
     if not installed.is_file():
@@ -171,10 +222,12 @@ def resolve_patchelf(lock: dict[str, Any], cache: Path = DEFAULT_CACHE) -> Path:
     if not installed.is_file():
         raise RuntimeError(f"patchelf did not unpack to the expected path: {installed}")
     installed.chmod(0o755)
-    help_text = run([str(installed), "--help"])
-    if "--page-size" not in (help_text.stdout + help_text.stderr):
-        raise RuntimeError(f"patchelf at {installed} lacks --page-size support")
-    return installed
+    version = _validate_patchelf(installed)
+    if version != str(section["version"]):
+        raise RuntimeError(
+            f"locked patchelf version mismatch: expected {section['version']}, got {version}"
+        )
+    return installed, version, "locked-download"
 
 
 def resolve_toolchain(build: Build, cache: Path = DEFAULT_CACHE) -> Toolchain:
@@ -191,12 +244,18 @@ def resolve_toolchain(build: Build, cache: Path = DEFAULT_CACHE) -> Toolchain:
         raise RuntimeError(
             f"NDK {revision} has no compiler for API {build.android_api.level}: {clang}"
         )
+    lld, lld_version, lld_source = resolve_lld(bindir)
+    patchelf, patchelf_version, patchelf_source = resolve_patchelf(lock, cache)
     return Toolchain(
         ndk=ndk,
         revision=revision,
         clang=clang,
         readelf=bindir / "llvm-readelf",
         strip=bindir / "llvm-strip",
-        patchelf=resolve_patchelf(lock, cache),
-        patchelf_version=lock["patchelf"]["version"],
+        lld=lld,
+        lld_version=lld_version,
+        lld_source=lld_source,
+        patchelf=patchelf,
+        patchelf_version=patchelf_version,
+        patchelf_source=patchelf_source,
     )

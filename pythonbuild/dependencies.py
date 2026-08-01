@@ -29,12 +29,35 @@ from typing import Any
 
 from .archive import safe_extract_tar
 from .downloads import acquire
-from .elf import android_note, elf_objects
+from .elf import android_note, elf_objects, elf_surface
 from .targets import ROOT
 from .toolchain import pkg_config_identity
 from .utils import file_identity, read_json_object, run_checked, run_logged, sha256_path
 
 RECIPE_LOCK = ROOT / "config/source/dependency-recipes.lock.json"
+
+# A Termux shell exports PREFIX and may also carry compiler search-path variables.
+# Those describe the build host, not the Android target. The recipe environment
+# script interprets PREFIX as a target dependency prefix, so inheriting it makes
+# target libraries silently link against Termux libraries (for example libz.so.1).
+TARGET_HOST_ENVIRONMENT_VARIABLES = (
+    "CFLAGS",
+    "CPPFLAGS",
+    "CPATH",
+    "CPLUS_INCLUDE_PATH",
+    "CXXFLAGS",
+    "C_INCLUDE_PATH",
+    "LDFLAGS",
+    "LD_LIBRARY_PATH",
+    "LIBRARY_PATH",
+    "LIBS",
+    "PKG_CONFIG",
+    "PKG_CONFIG_LIBDIR",
+    "PKG_CONFIG_PATH",
+    "PREFIX",
+)
+
+OPENSSL_NATIVE_CA_PATCHER = ROOT / "patches/openssl/android-native-ca.py"
 
 
 @dataclass(frozen=True)
@@ -104,6 +127,22 @@ def _openssldir_override(openssldir: str) -> Override:
     )
 
 
+def _openssl_native_ca_override() -> Override:
+    return Override(
+        path="openssl/build.sh",
+        pattern=r'^patch -p1 -i "\$recipe_dir/configuration\.patch"$',
+        replace=(
+            'patch -p1 -i "$recipe_dir/configuration.patch"\n'
+            'python3 "$recipe_dir/android-native-ca.py"'
+        ),
+        reason=(
+            "Android Conscrypt stores system roots under old subject hashes; use the "
+            "exact APEX directory as OpenSSL's default and fall back to old hashes "
+            "there only, after the ordinary current-hash lookup"
+        ),
+    )
+
+
 def file_prefix_map_override(host_paths: tuple[tuple[str, str], ...]) -> Override:
     """Keep host directories out of compiled debug information.
 
@@ -128,6 +167,78 @@ def file_prefix_map_override(host_paths: tuple[tuple[str, str], ...]) -> Overrid
     )
 
 
+def selected_toolchain_override() -> Override:
+    """Select the one NDK prebuilt that supplied the target compiler.
+
+    Android SDK installations can contain more than one prebuilt directory.
+    Upstream's wildcard assignment joins all of them into one string, which
+    produces impossible tool paths. The product toolchain has already selected
+    and prepended one compiler directory to PATH, so derive the prebuilt root
+    from that exact compiler instead of repeating host detection here.
+    """
+    return Override(
+        path="android-env.sh",
+        pattern=r'^toolchain=\$\(echo "\$ndk"/toolchains/llvm/prebuilt/\*\)$',
+        replace=(
+            'toolchain_bin="$(dirname "$(command -v '
+            '"${clang_triplet}${ANDROID_API_LEVEL}-clang")")"\n'
+            'toolchain="${toolchain_bin%/bin}"\n'
+            'unset toolchain_bin'
+        ),
+        reason=(
+            "an SDK may contain multiple NDK prebuilt directories; the wildcard "
+            "joins them into an invalid path, while PATH already identifies the "
+            "single compiler selected by the product toolchain"
+        ),
+    )
+
+
+def selected_linker_overrides() -> tuple[Override, Override]:
+    """Use one explicitly validated host LLD without changing the NDK tree.
+
+    Community AArch64 NDK prebuilts can carry a host ``ld.lld`` whose own TLS
+    segment is not executable on newer Android releases. The target compiler,
+    sysroot, and all other LLVM tools remain the NDK's; only the host linker
+    process may be selected explicitly. Both ``LD`` and Clang's driver choice
+    are set because build systems use both forms.
+    """
+    executable = Override(
+        path="android-env.sh",
+        pattern=r'^export LD="\$toolchain/bin/ld"$',
+        replace=(
+            'if [ -n "${PBSA_LLD:-}" ]; then\n'
+            '    case "$PBSA_LLD" in /*) ;; *) fail "PBSA_LLD must be absolute" ;; esac\n'
+            '    [ -x "$PBSA_LLD" ] || fail "$PBSA_LLD is not executable"\n'
+            '    export LD="$PBSA_LLD"\n'
+            'else\n'
+            '    export LD="$toolchain/bin/ld"\n'
+            'fi'
+        ),
+        reason=(
+            "allow a validated host LLD when the NDK's host linker cannot execute "
+            "on the build device, without mutating the NDK or changing target tools"
+        ),
+    )
+    driver = Override(
+        path="android-env.sh",
+        pattern=(
+            r'^export LDFLAGS="-Wl,--build-id=sha1 -Wl,--no-rosegment '
+            r'-Wl,-z,max-page-size=16384"$'
+        ),
+        replace=(
+            'export LDFLAGS="-Wl,--build-id=sha1 -Wl,--no-rosegment '
+            '-Wl,-z,max-page-size=16384"\n'
+            'if [ -n "${PBSA_LLD:-}" ]; then\n'
+            '    export LDFLAGS="-fuse-ld=$PBSA_LLD $LDFLAGS"\n'
+            'fi'
+        ),
+        reason=(
+            "make Clang invoke the same validated host LLD that direct LD users see"
+        ),
+    )
+    return executable, driver
+
+
 def bare_toolchain_override() -> Override:
     """Name the tools without the directory they happen to live in.
 
@@ -138,8 +249,8 @@ def bare_toolchain_override() -> Override:
     a later pass can rewrite. Found on PATH instead, so the same build works
     wherever the NDK is installed.
 
-    ``LD`` is left alone. It is the one tool whose bare name is also a host tool's,
-    and it is not recorded anywhere, so making it ambiguous would buy nothing.
+    ``LD`` is left explicit. It may name the NDK linker or a validated host LLD
+    override, and unlike the compiler command it is not recorded in target bytes.
     """
     return Override(
         path="android-env.sh",
@@ -297,6 +408,8 @@ def build_dependencies(
     host_paths: tuple[tuple[str, str], ...],
     sdk_root: Path,
     pkg_config_bin: Path,
+    toolchain_bin: Path,
+    lld: Path,
     lock_path: Path = RECIPE_LOCK,
 ) -> tuple[Path, dict[str, Any]]:
     """Build every dependency from source and merge them into one prefix."""
@@ -314,16 +427,20 @@ def build_dependencies(
     prefix.mkdir(parents=True)
 
     environment = dict(os.environ)
+    for variable in TARGET_HOST_ENVIRONMENT_VARIABLES:
+        environment.pop(variable, None)
     environment["ANDROID_API_LEVEL"] = str(android_api)
     # The recipes' android-env.sh refuses to run without it, and this build
     # already knows where the SDK is.
     environment.setdefault("ANDROID_HOME", str(sdk_root))
     environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
+    environment["PBSA_LLD"] = str(lld)
     environment["PATH"] = os.pathsep.join(
-        [str(pkg_config_bin), environment.get("PATH", "")]
+        [str(pkg_config_bin), str(toolchain_bin), environment.get("PATH", "")]
     )
-    # A search path inherited from the host would decide which .pc file is read.
-    environment.pop("PKG_CONFIG_PATH", None)
+    # The target environment above is intentionally closed over all compiler and
+    # pkg-config search paths inherited from the host. The pinned shim and the
+    # merged dependency prefix are introduced explicitly by this build instead.
 
     # One recipe revision, so every component is built the same way. The
     # overrides are not identical for every component: OpenSSL needs one the
@@ -334,7 +451,12 @@ def build_dependencies(
     prefix_map = file_prefix_map_override(host_paths)
 
     def overrides_for(name: str) -> list[Override]:
-        overrides = [_ndk_override(ndk_revision), bare_toolchain_override()]
+        overrides = [
+            _ndk_override(ndk_revision),
+            selected_toolchain_override(),
+            *selected_linker_overrides(),
+            bare_toolchain_override(),
+        ]
         # Every component but OpenSSL: their static objects are linked into
         # extension modules and carry host directories in their debug
         # information. OpenSSL writes the whole compiler command line into
@@ -345,6 +467,7 @@ def build_dependencies(
             overrides.append(prefix_map)
         elif openssldir:
             overrides.append(_openssldir_override(openssldir))
+            overrides.append(_openssl_native_ca_override())
         return overrides
 
     # The compiler is resolved from the patched environment script, since the NDK
@@ -365,7 +488,23 @@ def build_dependencies(
         # Reset and re-apply per component: the overrides differ for OpenSSL, and
         # the exactly-once guard would not match an already-patched file.
         _reset(repo)
-        applied[name] = [override.apply(repo) for override in overrides_for(name)]
+        patch_record: list[dict[str, Any]] = []
+        if name == "openssl":
+            patch_target = repo / "openssl/android-native-ca.py"
+            shutil.copyfile(OPENSSL_NATIVE_CA_PATCHER, patch_target)
+            patch_record.append(
+                {
+                    "path": "openssl/android-native-ca.py",
+                    "sha256": sha256_path(patch_target),
+                    "reason": (
+                        "build-time exact source transformation for Android's native "
+                        "Conscrypt trust store"
+                    ),
+                }
+            )
+        applied[name] = patch_record + [
+            override.apply(repo) for override in overrides_for(name)
+        ]
 
         # The recipes fetch their sources with wget and no checksum. Placing the
         # verified file where the recipe expects it means wget finds it already
@@ -416,6 +555,9 @@ def build_dependencies(
         "recipe_commit": commit,
         "compiler": compiler,
         "pkg_config": pkg_config_identity(),
+        "host_environment_policy": {
+            "unset_for_target_recipes": list(TARGET_HOST_ENVIRONMENT_VARIABLES),
+        },
         "overrides": applied,
         "android_api": android_api,
         "ndk_revision": ndk_revision,
@@ -447,6 +589,9 @@ def verify_dependency_prefix(
 
     mismatched: list[str] = []
     unstamped: list[str] = []
+    needed: dict[str, list[str]] = {}
+    missing_versioned: list[str] = []
+    libdir = prefix / "lib"
     for path in objects:
         rel = path.relative_to(prefix).as_posix()
         note = android_note(path, readelf)
@@ -454,9 +599,24 @@ def verify_dependency_prefix(
             unstamped.append(rel)
         elif note["api_level"] != android_api:
             mismatched.append(f"{rel} reports API {note['api_level']}")
+        dependencies = elf_surface(path, readelf)["needed"]
+        needed[rel] = dependencies
+        for dependency in dependencies:
+            # Android platform SONAMEs are unversioned. A versioned dependency
+            # that is not supplied by this prefix came from the build host's
+            # library search path and cannot resolve on a clean Android device.
+            if re.search(r"\.so\.\d", dependency) and not (
+                libdir / dependency
+            ).exists():
+                missing_versioned.append(f"{rel} needs {dependency}")
     if mismatched:
         raise RuntimeError(
             f"objects were not built for API {android_api}: {', '.join(mismatched[:5])}"
+        )
+    if missing_versioned:
+        raise RuntimeError(
+            "dependency objects require versioned libraries not built into the "
+            f"target prefix: {', '.join(missing_versioned[:5])}"
         )
 
     sample = android_note(objects[0], readelf) or {}
@@ -466,6 +626,7 @@ def verify_dependency_prefix(
         "ndk_version": sample.get("ndk_version"),
         "ndk_build_number": sample.get("ndk_build_number"),
         "unstamped": unstamped,
+        "needed": needed,
         "sha256": {
             path.relative_to(prefix).as_posix(): sha256_path(path) for path in objects
         },

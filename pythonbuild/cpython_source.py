@@ -18,15 +18,19 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .android_host import build_python_environment
 from .archive import newest_member_mtime, safe_extract_tar
 from .assemble import BUILD_PLACEHOLDER, TOOLCHAIN_PLACEHOLDER, PrefixSource
 from .dependencies import (
     bare_toolchain_override,
     build_dependencies,
     file_prefix_map_override,
+    selected_linker_overrides,
+    selected_toolchain_override,
 )
-from .downloads import acquire
+from .downloads import acquire, host_tag
 from .elf import android_note, elf_objects
+from .native_data import apply_cpython_android_native_data
 from .targets import Build
 from .toolchain import Toolchain, pkg_config_identity, pkg_config_shim
 from .utils import file_identity, read_json_object, run_logged
@@ -35,6 +39,10 @@ ANDROID_DRIVER = "Android/android.py"
 
 
 def _extract_source(archive: Path, destination: Path) -> Path:
+    # Source patches are applied in place below. Reusing a prior extraction would
+    # make a retry depend on how far the previous build progressed, while the
+    # expensive build interpreter lives separately under cross-build/build.
+    shutil.rmtree(destination, ignore_errors=True)
     destination.mkdir(parents=True, exist_ok=True)
     safe_extract_tar(archive, destination)
     roots = [path for path in destination.iterdir() if path.is_dir()]
@@ -65,6 +73,7 @@ def build_cpython(
     host: str,
     tzpath: str | None,
     toolchain_bin: Path,
+    lld: Path,
     pkg_config_bin: Path,
     readelf: str,
     source_date_epoch: int,
@@ -77,6 +86,7 @@ def build_cpython(
     source_archive = acquire(lock["source_archive"], cache, what="CPython source")
 
     source = _extract_source(source_archive, workspace / "source")
+    native_data_overrides = apply_cpython_android_native_data(source)
     cross_build = workspace / "cross-build"
     prefix = cross_build / host / "prefix"
 
@@ -98,6 +108,8 @@ def build_cpython(
         override.apply(source / "Android")
         for override in (
             file_prefix_map_override(host_paths),
+            selected_toolchain_override(),
+            *selected_linker_overrides(),
             bare_toolchain_override(),
         )
     ]
@@ -107,6 +119,7 @@ def build_cpython(
     # Android/android.py refuses to run without it.
     environment.setdefault("ANDROID_HOME", str(sdk_root))
     environment["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
+    environment["PBSA_LLD"] = str(lld)
     # The tools are named without their directory, so the directory has to be on
     # PATH. The environment script puts it there for the steps that source it, but
     # `make` deliberately does not source it — upstream relies on configure having
@@ -120,8 +133,11 @@ def build_cpython(
 
     configure_args = [f"--with-tzpath={tzpath}"] if tzpath else []
 
-    _driver(source, cross_build, environment, "configure-build")
-    _driver(source, cross_build, environment, "make-build")
+    build_environment, build_python_config_cache = build_python_environment(
+        environment, current_host_tag=host_tag()
+    )
+    _driver(source, cross_build, build_environment, "configure-build")
+    _driver(source, cross_build, build_environment, "make-build")
     # `--` so argparse treats the configure arguments as positional rather than
     # as options of its own, which is the convention the driver documents.
     _driver(
@@ -141,9 +157,10 @@ def build_cpython(
         "android_api": android_api,
         "host": host,
         "configure_args": configure_args,
+        "build_python_config_cache": build_python_config_cache,
         "pkg_config": pkg_config_identity(),
         "source_date_epoch": source_date_epoch,
-        "overrides": applied_overrides,
+        "overrides": [*applied_overrides, *native_data_overrides],
         "driver": ANDROID_DRIVER,
         "objects": verify_install_prefix(
             prefix, android_api=android_api, readelf=readelf
@@ -280,6 +297,8 @@ def prepare_source_prefix(
         source_date_epoch=source_date_epoch,
         host_paths=host_paths,
         pkg_config_bin=pkg_config_bin,
+        toolchain_bin=toolchain.readelf.parent,
+        lld=toolchain.lld,
         sdk_root=toolchain.sdk_root,
     )
     built_prefix, cpython = build_cpython(
@@ -290,6 +309,7 @@ def prepare_source_prefix(
         host=build.triple,
         tzpath=runtime_data.get("tzpath"),
         toolchain_bin=toolchain.readelf.parent,
+        lld=toolchain.lld,
         pkg_config_bin=pkg_config_bin,
         readelf=str(toolchain.readelf),
         source_date_epoch=source_date_epoch,

@@ -333,6 +333,8 @@ def _check_runtime_data(
     summary = {
         "mechanism": declared.get("mechanism"),
         "ca_certificate_count": observed.get("ca_certificate_count"),
+        "ca_default_verify_pass": observed.get("ca_default_verify_pass"),
+        "ca_default_verify": observed.get("ca_default_verify"),
         "tzpath_configured": observed.get("tzpath_configured"),
         "tzpath_present": observed.get("tzpath_present"),
         "zones": zones,
@@ -340,10 +342,15 @@ def _check_runtime_data(
     # Only what the build actually declares is required to work unaided. A path
     # this build does not compile in is not this build's promise to keep.
     problems = []
-    if declared.get("openssldir") and not observed.get("ca_certificate_count"):
+    ca_resolved = bool(
+        observed.get("ca_certificate_count")
+        or observed.get("ca_default_verify_pass")
+    )
+    if declared.get("openssldir") and not ca_resolved:
         problems.append(
-            f"no CA certificates resolved from {observed.get('openssl_cafile')!r} "
-            f"(present: {observed.get('openssl_cafile_present')})"
+            f"the default CA store could not verify a native root from "
+            f"{observed.get('openssl_capath')!r}: "
+            f"{observed.get('ca_default_verify') or observed.get('ca_error')}"
         )
     if declared.get("tzpath"):
         unresolved = {key: value for key, value in zones.items() if value != "pass"}

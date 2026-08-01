@@ -85,7 +85,10 @@ def receipt(**overrides: Any) -> dict[str, Any]:
             "runtime_data": {
                 "pass": True,
                 "ca_certificate_count": 119,
+                "ca_default_verify_pass": True,
+                "ca_default_verify": {"pass": True, "verified_certificate": "root.0"},
                 "openssl_cafile": "/etc/tls/cert.pem",
+                "openssl_capath": "/etc/tls/certs",
                 "openssl_cafile_present": True,
                 "tzpath_configured": "/usr/share/zoneinfo",
                 "tzpath_present": [],
@@ -195,12 +198,27 @@ class GateTest(unittest.TestCase):
     def test_a_build_that_compiles_a_trust_store_in_must_resolve_it(self) -> None:
         document = receipt()
         document["checks"]["runtime_data"]["ca_certificate_count"] = 0
+        document["checks"]["runtime_data"]["ca_default_verify_pass"] = False
+        document["checks"]["runtime_data"]["ca_default_verify"] = {
+            "pass": False,
+            "error": "unable to get local issuer certificate",
+        }
         document["checks"]["runtime_data"]["openssl_cafile_present"] = False
         self.refuses(
             "must resolve with nothing",
             document=document,
             runtime_data={"mechanism": "build-default", "openssldir": "/etc/tls"},
         )
+
+    def test_a_lazy_capath_verification_satisfies_the_builtin_store(self) -> None:
+        document = receipt()
+        document["checks"]["runtime_data"]["ca_certificate_count"] = 0
+        document["checks"]["runtime_data"]["ca_default_verify_pass"] = True
+        result = self.check(
+            document,
+            runtime_data={"mechanism": "build-default", "openssldir": "/etc/tls"},
+        )
+        self.assertTrue(result["runtime_data"]["ca_default_verify_pass"])
 
     def test_a_build_that_ships_a_data_product_is_not_held_to_one(self) -> None:
         # The same finding is not a fault for `upstream`: it compiles nothing in,
