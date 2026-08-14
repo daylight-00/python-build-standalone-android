@@ -82,7 +82,9 @@ class ResolveTest(unittest.TestCase):
 
 class DecisionsTest(unittest.TestCase):
     def write(self, text: str) -> Path:
-        directory = Path(self.enterContext(TemporaryDirectory()))
+        temporary = TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        directory = Path(temporary.name)
         path = directory / "pyconfig.h"
         path.write_text(text, encoding="utf-8")
         return path
