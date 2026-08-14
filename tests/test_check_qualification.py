@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = runpy.run_path(str(ROOT / "check-qualification.py"))
@@ -48,7 +48,7 @@ class ReleasedQualificationHistoryTest(unittest.TestCase):
         original = globals_["run"]
         globals_["run"] = self.with_git_tags(tags)
         try:
-            return function(tag, root=root)
+            return cast(str | None, function(tag, root=root))
         finally:
             globals_["run"] = original
 
