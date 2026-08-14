@@ -29,7 +29,7 @@ android:
         # Built from CPython source together with all six pinned dependency
         # recipes, so the build controls its own OpenSSL and time zone defaults.
         producer: cpython-source
-        input_lock: config/source/cpython-3.14.6.lock.json
+        input_lock: config/source/cpython-3.14.7.lock.json
 
         android_api:
           level: 34
@@ -59,7 +59,7 @@ android:
         # The official Python.org Android package, re-assembled. CPython and
         # native dependency bytes are exactly the official ones.
         producer: upstream-prebuilt
-        input_lock: config/upstream/cpython-3.14.6-aarch64-linux-android.lock.json
+        input_lock: config/upstream/cpython-3.14.7-aarch64-linux-android.lock.json
 
         android_api:
           level: 24

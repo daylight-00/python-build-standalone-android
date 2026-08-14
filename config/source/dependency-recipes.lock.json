@@ -97,7 +97,7 @@
     }
   ],
   "verification": {
-    "versions_match_upstream": "every version and build number here is the one CPython 3.14.6's Android/android.py unpack_deps names, so the source build produces the dependency set the interpreter expects",
+    "versions_match_upstream": "every version and build number here is the one CPython 3.14.7's Android/android.py unpack_deps names, so the source build produces the dependency set the interpreter expects",
     "recipe_downloads_are_unverified": "the upstream recipes fetch their sources with wget and no checksum; the build pre-populates each recipe's download directory with the verified file above so the recipe finds it already present",
     "api_level_is_checked_per_object": "the NDK stamps .note.android.ident into every executable and shared object; the build fails if any of them reports an API level other than the one requested",
     "compiler_is_checked": "the recipe environment is evaluated once and the resolved CC must name the requested API level"
