@@ -22,6 +22,7 @@ from pathlib import Path
 
 from pythonbuild import waiver
 from pythonbuild.qualification import (
+    QUALIFICATION_ROOT,
     QualificationError,
     previous_qualified_tag,
     shipped_api_levels,
@@ -88,15 +89,36 @@ def changed_since(tag: str) -> list[str]:
     return [line for line in result.stdout.splitlines() if line]
 
 
+def _git_tag_exists(tag: str) -> bool:
+    """Whether ``tag`` names a real Git tag in the release checkout."""
+    result = run(["git", "show-ref", "--verify", "--quiet", f"refs/tags/{tag}"])
+    return result.returncode == 0
+
+
+def previous_released_qualified_tag(
+    tag: str, root: Path = QUALIFICATION_ROOT
+) -> str | None:
+    """Newest earlier qualified candidate that was actually released as a Git tag.
+
+    Qualification receipts may intentionally exist for candidates that were never
+    released. Those receipts remain useful evidence, but there is no commit range
+    to diff from unless the candidate also has a Git tag.
+    """
+    previous = previous_qualified_tag(tag, root=root)
+    while previous is not None and not _git_tag_exists(previous):
+        previous = previous_qualified_tag(previous, root=root)
+    return previous
+
+
 def consider_waiver(
     build: Build, tag: str, refusal: QualificationError, report: Path | None
 ) -> int:
     """Permit an unattended release only when the change is upstream's alone."""
-    previous = previous_qualified_tag(tag)
+    previous = previous_released_qualified_tag(tag)
     if previous is None:
         print(
             f"qualification gate: REFUSED\n\n{refusal}\n\n"
-            f"No earlier qualified tag to compare against, so there is nothing a "
+            f"No earlier released qualified tag to compare against, so there is nothing a "
             f"waiver could rest on.",
             file=sys.stderr,
         )
