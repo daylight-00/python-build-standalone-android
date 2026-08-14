@@ -42,33 +42,31 @@ class ReleasedQualificationHistoryTest(unittest.TestCase):
 
         return fake_run
 
+    def call_with_git_tags(self, tag: str, root: Path, tags: set[str]) -> str | None:
+        function = SCRIPT["previous_released_qualified_tag"]
+        globals_ = function.__globals__
+        original = globals_["run"]
+        globals_["run"] = self.with_git_tags(tags)
+        try:
+            return function(tag, root=root)
+        finally:
+            globals_["run"] = original
+
     def test_unreleased_qualified_candidate_is_skipped(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.write_receipt(root, "20260729")
             self.write_receipt(root, "20260730")
-            original = SCRIPT["run"]
-            SCRIPT["run"] = self.with_git_tags({"20260729"})
-            try:
-                self.assertEqual(
-                    SCRIPT["previous_released_qualified_tag"]("20260814", root=root),
-                    "20260729",
-                )
-            finally:
-                SCRIPT["run"] = original
+            self.assertEqual(
+                self.call_with_git_tags("20260814", root, {"20260729"}),
+                "20260729",
+            )
 
     def test_no_released_qualified_candidate_returns_none(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.write_receipt(root, "20260730")
-            original = SCRIPT["run"]
-            SCRIPT["run"] = self.with_git_tags(set())
-            try:
-                self.assertIsNone(
-                    SCRIPT["previous_released_qualified_tag"]("20260814", root=root)
-                )
-            finally:
-                SCRIPT["run"] = original
+            self.assertIsNone(self.call_with_git_tags("20260814", root, set()))
 
 
 if __name__ == "__main__":
