@@ -36,7 +36,7 @@ class ParseTest(unittest.TestCase):
                     self.assertEqual(found.artifact_infix, build.artifact_infix)
                     self.assertEqual(found.build_option, build.build_option)
 
-    def test_the_flagship_is_recognised_by_carrying_no_marker(self) -> None:
+    def test_the_flagship_is_recognized_by_carrying_no_marker(self) -> None:
         found = parse(f"cpython-{VERSION}+{TAG}-aarch64-linux-android-full.tar.zst")
         assert found is not None
         self.assertEqual(found.build_option, "default")
