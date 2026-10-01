@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "lock_kind": "android-dependency-source-build",
-  "note": "The source build compiles CPython's own dependency set rather than unpacking the prebuilt archives the upstream Android flow downloads. Versions and build numbers are the ones CPython 3.14.6 names, so this remains upstream's dependency set; only the two overrides below are applied.",
+  "note": "The source build compiles CPython's own dependency set rather than unpacking the prebuilt archives the upstream Android flow downloads. Versions and build numbers are the ones the pinned CPython names, so this remains upstream's dependency set; only the two overrides below are applied.",
   "recipes": {
     "repository": "https://github.com/beeware/cpython-android-source-deps",
     "commit": "f4c94a0",

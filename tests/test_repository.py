@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import unittest
 
+from pythonbuild.assemble import license_versions, stamp_versions
 from pythonbuild.targets import DEFAULT_BUILD_OPTION, get_build, load_builds
 from pythonbuild.utils import read_json_object
 from tests.support import ROOT
@@ -98,7 +99,7 @@ class LicenseManifestTest(unittest.TestCase):
                     component.get("spdx") or component.get("classification"),
                     "states neither an SPDX identifier nor why it has none",
                 )
-                # Present even when empty: three components carry their licence
+                # Present even when empty: three components carry their license
                 # inside the payload or are only linked against, and the empty
                 # value is how the manifest says so.
                 self.assertIn("file", component)
@@ -107,6 +108,74 @@ class LicenseManifestTest(unittest.TestCase):
         manifest = read_json_object(ROOT / "licenses" / "components.json")
         files = [c["file"] for c in manifest["components"] if c.get("file")]
         self.assertEqual(len(files), len(set(files)))
+
+
+class LicenseVersionsTest(unittest.TestCase):
+    """The manifest ships in every archive, so a stale version in it ships everywhere.
+
+    CPython's version was once typed here and went stale in the pin bump that was
+    meant to be the unattended case.
+    """
+
+    def test_the_real_manifest_and_the_real_locks_agree(self) -> None:
+        source = read_json_object(ROOT / "licenses" / "components.json")
+        versions = license_versions(
+            read_json_object(get_build("aarch64-linux-android").input_lock_path())[
+                "python"
+            ]["version"]
+        )
+        stamped = stamp_versions(source, versions)
+        shipped = {
+            component["component"]: component.get("version")
+            for component in stamped["components"]
+        }
+        for name, version in versions.items():
+            with self.subTest(component=name):
+                self.assertEqual(shipped[name], version)
+
+    def test_a_pinned_component_takes_its_version_from_the_lock(self) -> None:
+        stamped = stamp_versions(
+            {"components": [{"component": "openssl"}]}, {"openssl": "3.5.7"}
+        )
+        self.assertEqual(
+            stamped["components"], [{"component": "openssl", "version": "3.5.7"}]
+        )
+
+    def test_the_lock_names_xz_where_the_manifest_names_liblzma(self) -> None:
+        self.assertIn("liblzma", license_versions("3.14.7"))
+        self.assertNotIn("xz", license_versions("3.14.7"))
+
+    def test_a_component_the_locks_do_not_pin_is_left_as_written(self) -> None:
+        # mpdecimal is vendored in CPython's tree, so no lock states it.
+        manifest = {
+            "components": [
+                {"component": "cpython"},
+                {"component": "mpdecimal", "version": "2.5.1"},
+            ]
+        }
+        stamped = stamp_versions(manifest, {"cpython": "3.14.7"})
+        self.assertEqual(
+            stamped["components"][1], {"component": "mpdecimal", "version": "2.5.1"}
+        )
+
+    def test_a_version_typed_for_a_pinned_component_is_refused(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "types a version for cpython"):
+            stamp_versions(
+                {"components": [{"component": "cpython", "version": "3.14.6"}]},
+                {"cpython": "3.14.7"},
+            )
+
+    def test_a_pinned_component_with_no_entry_is_refused(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, r"no license entry: \['zstd'\]"):
+            stamp_versions(
+                {"components": [{"component": "cpython"}]},
+                {"cpython": "3.14.7", "zstd": "1.5.7"},
+            )
+
+    def test_the_manifest_given_is_not_modified(self) -> None:
+        manifest = {"components": [{"component": "cpython"}]}
+        stamp_versions(manifest, {"cpython": "3.14.7"})
+        self.assertEqual(manifest, {"components": [{"component": "cpython"}]})
 
 
 if __name__ == "__main__":
