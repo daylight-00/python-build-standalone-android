@@ -1,16 +1,23 @@
-"""When an unattended release may go out without a receipt for its own bytes.
+"""What an unattended release without a receipt for its own bytes may claim.
 
 The waiver never claims an old receipt covers new bytes. It claims that the only
 thing which changed is upstream's, so the parts this project is answerable for
 are the ones a device already ran. Everything here is a way that claim can be
-false.
+false — and when it is, the release is not refused, only held to a weaker one.
 """
 
 from __future__ import annotations
 
 import unittest
 
-from pythonbuild.waiver import assess, is_waivable
+from pythonbuild.waiver import (
+    BASES,
+    CHANGED,
+    NEVER_RUN,
+    UPSTREAM_ONLY,
+    assess,
+    is_waivable,
+)
 
 PINS = [
     "config/source/cpython-3.14.7.lock.json",
@@ -93,6 +100,16 @@ class AssessTest(unittest.TestCase):
         found = waiver(PINS, previous=34, declared=35)
         self.assertFalse(found.granted)
         self.assertIn("the API floor moved from 34 to 35", found.reason())
+
+    def test_only_an_upstream_change_earns_the_waiver_proper(self) -> None:
+        self.assertEqual(waiver(PINS).basis, UPSTREAM_ONLY)
+
+    def test_anything_else_is_a_weaker_claim_not_a_missing_one(self) -> None:
+        self.assertEqual(waiver([*PINS, "build.py"]).basis, CHANGED)
+        self.assertEqual(waiver(PINS, previous=34, declared=35).basis, CHANGED)
+
+    def test_the_bases_run_from_the_strongest_claim_to_the_weakest(self) -> None:
+        self.assertEqual(BASES, (UPSTREAM_ONLY, CHANGED, NEVER_RUN))
 
     def test_the_reason_does_not_list_every_blocking_path(self) -> None:
         found = waiver([f"pythonbuild/m{n}.py" for n in range(9)])

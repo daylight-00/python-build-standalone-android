@@ -279,7 +279,8 @@ series, and every series added costs a device qualification per release forever.
 
 Releases are manual, as upstream: `workflow_dispatch` with an explicit tag and
 commit, gated on a protected environment. There is no automatic release on
-green.
+green. The one exception is opt-in and off by default — see
+[releasing unattended](#releasing-unattended).
 
 `dry-run` defaults to true. A release is the one action in this repository that
 cannot be taken back, so publishing has to be asked for explicitly.
@@ -310,7 +311,9 @@ start is recorded as a failure rather than losing the receipt.
 Receipts are committed under `qualification/<tag>/cpython-<version>-<build>.json`
 — named after the artifact stem, so a directory says which Python each receipt
 qualified without opening it — and the release workflow refuses to publish unless
-one covers **every artifact in the release by SHA-256**. A receipt is evidence only for the bytes it names, so one produced
+one covers **every artifact in the release by SHA-256**, or the waiver is allowed
+and the release goes out as a prerelease that says it has none
+([below](#releasing-without-one)). A receipt is evidence only for the bytes it names, so one produced
 against an earlier build cannot be carried forward silently. The gate also
 checks that the device's ABI is one this project releases for and that the
 interpreter reported the API level the build declares.
@@ -322,32 +325,76 @@ thing standing between this project and a release that follows a new CPython on
 its own. `allow-waiver` opens it, and does so without weakening what a receipt
 means — nothing claims an older one covers newer bytes.
 
-The claim it makes instead is weaker and true. If the only difference between the
-last build a device ran and this one is the pinned CPython input, then the
-launcher, the loader normalization, the metadata overlay, the curation and the
-licence set are the same code that was qualified, and the residual risk belongs
-to upstream. That is a risk an unattended release can reasonably take. If
-anything else differs, the risk is this project's own and the receipt is
-required.
+What it does is publish on a claim sized to what is actually known, and say which.
+The gate records one of three footings, strongest first, and the release notes open
+with the caution that matches it:
 
-`pythonbuild/waiver.py` decides it, and the polarity is deliberate: it names what
-is *allowed* to differ and blocks on everything else, so a file nobody considered
-fails closed. Two things sit outside the allowance on purpose.
-`config/toolchain.lock.json` is upstream in origin but not in effect — an NDK
-bump changes every compiled byte and can move the API floor. And a floor that
-moved blocks a waiver by itself, because a different floor means a different set
-of devices, which no amount of unchanged packaging stands in for.
+| Footing | When | What the notes claim |
+| --- | --- | --- |
+| `upstream-only` | the only difference from the last build a device ran is the pinned CPython input | the rest of the code is the code a device ran; what is unverified is what came with the new upstream |
+| `changed` | anything else differs — a file of this project's own, a toolchain bump, or a moved API floor | nothing about a device; only what CI checks |
+| `never-run` | no device ever ran this build | nothing about a device; only what CI checks |
 
-What a waived release is not is the default. It is published as a prerelease, its
-notes open with the fact, and `latest-release` and the uv catalogs are left
-pointing at the last qualified release — so `uv python install` keeps resolving
-to bytes a device ran, and taking a waived build is an explicit act. Promoting
-one means qualifying those exact artifacts, committing the receipt, and
-re-releasing without the waiver.
+Only the first is a waiver in the sense of resting on an earlier receipt. If the
+only difference is the pinned CPython input, then the launcher, the loader
+normalization, the metadata overlay, the curation and the licence set are the same
+code that was qualified, and the residual risk belongs to upstream. In the other
+two the risk may be this project's own, and the notes say that the code which
+assembled the interpreter is not known to be the code a device ran. What CI checks
+is the same in all three: every archive is byte-reproducible and holds to the
+distribution contract.
 
-The verdict travels with the artifacts as
-`<build>.qualification.json` rather than being inferred from what the operator
-asked for: a release is qualified when every build in it was.
+The second and third used to be refusals. A refusal meant the first commit to
+touch anything but a pin ended unattended releases until somebody found a device,
+and it protected nobody the prerelease channel does not already protect: those
+bytes are kept out of what `uv python install` resolves either way.
+
+`pythonbuild/waiver.py` decides between the first two, and the polarity is
+deliberate: it names what is *allowed* to differ and drops the claim on everything
+else, so a file nobody considered fails closed. Two things sit outside the
+allowance on purpose. `config/toolchain.lock.json` is upstream in origin but not
+in effect — an NDK bump changes every compiled byte and can move the API floor.
+And a floor that moved drops it by itself, because a different floor means a
+different set of devices, which no amount of unchanged packaging stands in for.
+
+What a release without a receipt is not is the default. It is published as a
+prerelease, its notes open with the fact, and `latest-release` and the uv catalogs
+are left pointing at the last qualified release — so `uv python install` keeps
+resolving to bytes a device ran, and taking one is an explicit act. Promoting one
+means qualifying those exact artifacts, committing the receipt, and re-releasing
+without the waiver.
+
+The verdict travels with the artifacts as `<build>.qualification.json`, footing
+and reason included, rather than being inferred from what the operator asked for:
+a release is qualified when every build in it was, and when it is not, the notes
+take their wording from the weakest build's footing.
+
+### Releasing unattended
+
+`auto-release.yml` takes the person out of dispatching. It runs when a push to
+`main` touches `config/**` and once a day, and it dispatches the release workflow
+with the waiver allowed when some pinned CPython version has no published release.
+A bump merged on Monday is released without anyone choosing a tag or a commit.
+
+It is idempotent, which is what lets the daily run double as a retry: it does
+nothing while every pinned version has a release, while a release is already
+running, or once today's tag is taken. A release that failed is attempted again
+the next morning.
+
+A release cannot be taken back, so there are two brakes, and both are off until
+someone chooses otherwise. The repository variable `AUTO_RELEASE` has to be
+`true`; until it is, the workflow does nothing at all.
+
+```console
+$ gh variable set AUTO_RELEASE --body true
+```
+
+And the `release` environment gates the release workflow itself, so giving it
+required reviewers puts a person back in the loop without touching anything else.
+
+What is still manual is merging the pull request that `update-pins` opens, and
+everything that needs a device: a release this produces is a prerelease until
+somebody qualifies its bytes.
 
 ## uv integration
 

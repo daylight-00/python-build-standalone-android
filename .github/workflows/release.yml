@@ -21,9 +21,9 @@ on:
         default: true
       allow-waiver:
         description: >-
-          Publish without a device receipt when nothing but the pinned CPython
-          input has changed since the last qualified tag. Such a release is
-          marked as a prerelease and does not become what uv installs.
+          Publish without a device receipt. Such a release is marked as a
+          prerelease, its notes say what it stands on, and it does not become
+          what uv installs.
         type: boolean
         default: false
 

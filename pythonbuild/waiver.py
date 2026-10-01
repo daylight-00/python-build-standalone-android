@@ -1,19 +1,24 @@
-"""When a release may go out without a device receipt for its own bytes.
+"""What a release without a device receipt can honestly say about itself.
 
 A qualification receipt is evidence only for the bytes it names, and that does
 not change here: nothing below claims an older receipt covers a newer build.
 
-What it claims is weaker and true. If the only thing that differs between the
-last build a device ran and this one is the pinned CPython input, then every
-part of the distribution this project is responsible for — the launcher, the
-loader normalization, the metadata overlay, the curation, the licence set — is
-the same code that was qualified, and the residual risk is upstream's. That is
-the risk an unattended release is willing to take. If anything else differs, the
-risk is this project's own and the receipt is required.
+An unattended release goes out without one, and the claim it makes depends on
+how far it is from the last build a device ran. If the only thing that differs
+is the pinned CPython input, then every part of the distribution this project is
+responsible for — the launcher, the loader normalization, the metadata overlay,
+the curation, the licence set — is the same code that was qualified, and the
+residual risk is upstream's. That is the strongest claim available without a
+device, and it is the only one that is a *waiver*: ``UPSTREAM_ONLY``.
+
+If anything else differs, the risk is this project's own and nothing can be said
+about it, but the release is still published as a prerelease that says so:
+``CHANGED``. And a build no device has ever run has no earlier build to stand on
+at all: ``NEVER_RUN``. The three are recorded, and the release notes say which.
 
 The polarity matters. The set below names what is *allowed* to differ, and
-everything else differing blocks the waiver, so a file nobody thought about
-fails closed. Two things are deliberately outside it:
+everything else differing drops the claim to ``CHANGED``, so a file nobody
+thought about fails closed. Two things are deliberately outside it:
 
 ``config/toolchain.lock.json``
     An NDK or patchelf bump changes every compiled byte and can move the API
@@ -27,6 +32,12 @@ from __future__ import annotations
 
 import fnmatch
 from dataclasses import dataclass
+
+# What an unqualified release stands on, strongest claim first.
+UPSTREAM_ONLY = "upstream-only"
+CHANGED = "changed"
+NEVER_RUN = "never-run"
+BASES = (UPSTREAM_ONLY, CHANGED, NEVER_RUN)
 
 # Allowed to differ between the qualified commit and the one being released.
 # Everything here either is a pin that follows CPython, or cannot reach a byte
@@ -62,6 +73,10 @@ class Waiver:
     @property
     def granted(self) -> bool:
         return not self.blocking and self.previous_api_level == self.declared_api_level
+
+    @property
+    def basis(self) -> str:
+        return UPSTREAM_ONLY if self.granted else CHANGED
 
     def reason(self) -> str:
         if self.previous_api_level != self.declared_api_level:
@@ -105,4 +120,13 @@ def assess(
     )
 
 
-__all__ = ["WAIVABLE", "Waiver", "assess", "is_waivable"]
+__all__ = [
+    "BASES",
+    "CHANGED",
+    "NEVER_RUN",
+    "UPSTREAM_ONLY",
+    "WAIVABLE",
+    "Waiver",
+    "assess",
+    "is_waivable",
+]

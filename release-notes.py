@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from pythonbuild import waiver
 from pythonbuild.catalog import CATALOG_FLAVOR
 from pythonbuild.qualification import previous_qualified_tag, shipped_api_levels
 from pythonbuild.targets import DEFAULT_BUILD_OPTION, Build, load_builds
@@ -71,25 +72,75 @@ def _resolve(receipt: dict[str, Any], builds: dict[str, Build]) -> Build:
     return build
 
 
-def _unqualified_callout() -> list[str]:
-    """A release nobody ran has to say so before it says anything else."""
-    return [
-        "> [!CAUTION]",
-        "> **No device qualification receipt covers these archives.** Every release "
-        "before this one was run on a physical device first; this one was not.",
-        ">",
-        "> It was published because nothing but the pinned CPython input changed "
-        "since the last release that was — so the launcher, the loader "
-        "normalization, the metadata overlay and the licence set are the same code "
-        "a device did run. What is unverified is whatever came with the new "
-        "upstream: that every extension module still loads, that the compiled-in "
-        "trust store still resolves, and that the prefix still relocates.",
-        ">",
-        "> `uv python install` is unaffected — the catalogs still resolve to the "
-        "last qualified release. Taking this one is an explicit choice: download "
-        "an archive, or point `--python-downloads-json-url` at this tag.",
-        "",
+def _weakest_waiver(verdicts: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The claim a release with several builds can make is its weakest build's."""
+    waivers = [
+        verdict["waiver"]
+        for verdict in verdicts
+        if verdict.get("device_qualified") is not True
+        and verdict.get("waiver", {}).get("basis") in waiver.BASES
     ]
+    return max(
+        waivers, key=lambda found: waiver.BASES.index(found["basis"]), default=None
+    )
+
+
+def _unqualified_callout(found: dict[str, Any] | None) -> list[str]:
+    """A release nobody ran has to say so before it says anything else.
+
+    What follows the first sentence depends on the footing: a release that moved
+    only upstream's pin can say the rest of the code is what a device ran, and one
+    that cannot must not. With no recorded footing at all it claims nothing.
+    """
+    lines = [
+        "> [!CAUTION]",
+        "> **No device qualification receipt covers these archives.** None of "
+        "them was run on a physical device.",
+        ">",
+    ]
+    basis = found["basis"] if found else None
+    if found and basis == waiver.UPSTREAM_ONLY:
+        lines.append(
+            "> It was published because nothing but the pinned CPython input changed "
+            f"since `{found['previous_tag']}`, which a device did run — so the "
+            "launcher, the loader normalization, the metadata overlay and the "
+            "licence set are the same code. What is unverified is whatever came "
+            "with the new upstream: that every extension module still loads, that "
+            "the compiled-in trust store still resolves, and that the prefix "
+            "still relocates."
+        )
+    elif found and basis == waiver.CHANGED:
+        lines.append(
+            "> It was published anyway, and unlike a routine CPython patch bump it "
+            f"cannot lean on an earlier device run: {found['reason']}. The code "
+            "that assembles the interpreter is not known to be the code a device "
+            "ran, so nothing here vouches that it works on one. What was checked "
+            "is what CI can check: every archive is byte-reproducible and holds "
+            "to the distribution contract."
+        )
+    elif found and basis == waiver.NEVER_RUN:
+        lines.append(
+            "> It was published anyway, and there is no earlier device run to lean "
+            f"on: {found['reason']}. Nothing here vouches that it works on a "
+            "device. What was checked is what CI can check: every archive is "
+            "byte-reproducible and holds to the distribution contract."
+        )
+    else:
+        lines.append(
+            "> Nothing here vouches that it works on a device. What was checked is "
+            "what CI can check: every archive is byte-reproducible and holds to "
+            "the distribution contract."
+        )
+    lines.extend(
+        [
+            ">",
+            "> `uv python install` is unaffected — the catalogs still resolve to the "
+            "last qualified release. Taking this one is an explicit choice: download "
+            "an archive, or point `--python-downloads-json-url` at this tag.",
+            "",
+        ]
+    )
+    return lines
 
 
 def _floor_callout(previous: str, moved: list[tuple[str, int, int]]) -> list[str]:
@@ -138,6 +189,7 @@ def render(
     previous_tag: str | None = None,
     *,
     device_qualified: bool = True,
+    verdicts: list[dict[str, Any]] | None = None,
 ) -> str:
     builds = load_builds()
     # Ordered by build, flagship first, rather than by whatever order the receipts
@@ -155,7 +207,7 @@ def render(
     ]
     lines: list[str] = []
     if not device_qualified:
-        lines.extend(_unqualified_callout())
+        lines.extend(_unqualified_callout(_weakest_waiver(verdicts or [])))
 
     # Above everything else, because a reader who takes in nothing but the first
     # paragraph still has to learn that their device may have dropped out.
@@ -246,6 +298,15 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     receipts = [read_json_object(path) for path in paths]
+    # What the release gate recorded about each build, next to the artifacts. The
+    # tag is read out of the verdict: the file is named after the build alone.
+    verdicts = [
+        verdict
+        for verdict in map(
+            read_json_object, sorted(args.dist_dir.rglob("*.qualification.json"))
+        )
+        if verdict.get("tag") == args.tag
+    ]
 
     notes = render(
         receipts,
@@ -253,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
         args.repository,
         args.previous_tag,
         device_qualified=not args.not_device_qualified,
+        verdicts=verdicts,
     )
     if args.output:
         args.output.write_text(notes, encoding="utf-8")
