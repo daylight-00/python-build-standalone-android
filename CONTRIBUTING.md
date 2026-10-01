@@ -44,8 +44,9 @@ project a bug at least once. The ones that most often catch a first patch:
 Where this project diverges from astral's contract or patches an upstream
 recipe, the divergence and its justification are written down next to it. A
 divergence with no recorded reason is treated as a defect. The same applies to
-the tooling: `ruff.toml` and `mypy.ini` track upstream's settings, and where
-they do not, the file says why.
+the tooling: `ruff.toml` tracks upstream's settings, and where it does not, the
+file says why. Upstream has since replaced mypy with `ty`; `mypy.ini` stays until
+this project follows.
 
 ## Commits
 

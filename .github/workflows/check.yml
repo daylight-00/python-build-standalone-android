@@ -51,9 +51,9 @@ jobs:
         with:
           enable-cache: true
 
-      # pyproject declares a floor of 3.10, matching upstream. A floor nothing
+      # pyproject declares a floor of 3.11, matching upstream. A floor nothing
       # ever runs on is a claim with no evidence behind it.
       - run: >-
-          uv run --python 3.10 --no-project
+          uv run --python 3.11 --no-project
           --with pyyaml --with zstandard --with pkgconf
           python -m unittest discover -s tests -t .
