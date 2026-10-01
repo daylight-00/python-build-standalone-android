@@ -89,7 +89,9 @@ $ ./update-pins.py [--write]                               # follow python.org's
 ```
 
 `just` recipes wrap these; `just --list` shows them. Releases are manual,
-gated, and default to a dry run — see `.github/workflows/release.yml`.
+gated, and default to a dry run — see `.github/workflows/release.yml`. The one
+thing that dispatches it is `auto-release.yml`, which does nothing until the
+`AUTO_RELEASE` repository variable is `true`.
 
 Building from source needs an Android NDK at the pinned revision; the build
 prints how to install it if it cannot find one.

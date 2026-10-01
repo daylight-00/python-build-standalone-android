@@ -64,12 +64,12 @@ of the following would quietly break that, and is handled explicitly:
   because multi-threaded output depends on how the work was divided.
 - **Host paths.** Nothing inside an archive names a directory of the machine that
   built it: not the build tree, not the toolchain, not the build user's home.
-  Generated text is rewritten to a placeholder, compiled objects are given
+  Generated text is rewritten to a placeholder. Compiled objects are given
   `-ffile-prefix-map` for both the build tree and the NDK, since an object's line
-  table names the sysroot headers it read, and the tools are named without their
+  table names the sysroot headers it read. The tools are named without their
   directory so that the command lines a build records about itself — OpenSSL's
-  compiler banner, configure's `CONFIG_ARGS` — carry no path at all. That last one
-  cannot be fixed afterwards: a string inside a shared object is not rewritable.
+  compiler banner, configure's `CONFIG_ARGS` — carry no path at all; that cannot
+  be fixed afterwards, because a string inside a shared object is not rewritable.
 - **The `pkg-config` on the machine.** Two implementations are in circulation and
   they disagree on which `.pc` file a dependency resolves to and on how the flags
   it yields are spelled. configure records what it was handed, so the
@@ -177,15 +177,15 @@ Those archives carry third-party code under its own terms:
 | Component | License |
 | --- | --- |
 | CPython | Python-2.0, CNRI-Python |
-| OpenSSL 3.5.7 | Apache-2.0 |
+| OpenSSL | Apache-2.0 |
 | SQLite | public domain |
 | libffi | MIT |
 | bzip2 | BSD-style |
-| liblzma (xz 5.4.6) | public domain |
+| liblzma (xz) | public domain |
 | zstd | BSD-3-Clause / GPL-2.0 dual; BSD applies |
 | mpdecimal | BSD-2-Clause |
 | Expat | MIT |
-| HACL\* | Apache-2.0 / MIT dual |
+| HACL\* | MIT |
 | pip and its vendored packages | MIT, Apache-2.0, BSD, MPL-2.0 |
 | certifi CA payload (data track) | MPL-2.0 |
 
@@ -203,17 +203,19 @@ obligations on the release process rather than on the license choice:
   obligation attaches. The assembler rejects an upstream archive that
   unexpectedly contains `prefix/bin`.
 
-One file here is not original: `cpython-android/python.c` is modelled on
+Two files here are not original. `cpython-android/python.c` is modelled on
 CPython's `Programs/python.c` and is covered by the Python license, as noted in
-its header.
+its header. `check.py` is upstream's, adapted, and stays under MPL-2.0 with its
+notice. `pythonbuild/conformance.py` restates the field list of upstream's
+`PYTHON.json` reader, which is a description of a format rather than its code.
 
 ### Where the license texts live
 
 Per-component license texts are committed at `licenses/` and copied into every
-archive, one plain-text file per component, as upstream does. `licenses/components.json`
-records, for each component, its version, its SPDX identifier, which text ships
-for it, and where that text came from; the assembler fails if the manifest and
-the shipped set disagree.
+archive, one plain-text file per component, as upstream does.
+`licenses/components.json` records, for each component, its version, its SPDX
+identifier, which text ships for it, and where that text came from; the
+assembler fails if the manifest and the shipped set disagree.
 
 The placement deviates from upstream by one directory, deliberately. Upstream
 copies its texts into `python/licenses/`, which is a sibling of
@@ -234,6 +236,4 @@ several differ from upstream's copy of the same component: upstream's
 `LICENSE.liblzma.txt` carries the 0BSD terms that XZ Utils adopted in 5.6, while
 the 5.4.6 this project ships is public domain.
 
-
 [pbs]: https://github.com/astral-sh/python-build-standalone
-[research]: https://github.com/daylight-00/cpython-android-cli

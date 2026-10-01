@@ -20,9 +20,8 @@ An archive can be held to the distribution contract before it is used:
 $ ./validate-distribution.py cpython-3.14.6+<tag>-…-install_only.tar.gz
 ```
 
-That checks the metadata against the schema upstream's own reader enforces, the
-extension modules against what CPython says it built, the licence texts against
-the manifest, and the member paths. It needs only this repository, not a build.
+It needs only this repository, not a build; what it checks is described under
+[Checking what you built](building.md#checking-what-you-built).
 
 Machines can resolve the newest release from the `latest-release` branch:
 
@@ -37,10 +36,10 @@ https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/la
 | `upstream` | 7.0 (API 24) | widest device coverage; the permanent baseline |
 | *(none)* | 14 (API 34) | the flagship: faster, and HTTPS works out of the box |
 
-Both are `arm64-v8a`. See [`technotes.md`](technotes.md#the-android-api-policy) for
-why each minimum is what it is, and
+Both are `arm64-v8a`. [The API policy](technotes.md#the-android-api-policy)
+explains why each minimum is what it is, and
 [why a source build is worth having](technotes.md#why-a-source-build-is-worth-having)
-for the measured difference.
+gives the measured difference.
 
 ## With uv
 
@@ -59,9 +58,9 @@ download-metadata-upstream.json   the baseline build
 ```
 
 The catalogs resolve to the newest **device-qualified** release. A release
-published without a device receipt is marked as a prerelease and deliberately
-left out of them, so `uv python install` never lands on bytes no device ran —
-see [releasing without one](technotes.md#releasing-without-one).
+published without a device receipt is a prerelease and is deliberately left out
+of them, so `uv python install` never lands on bytes no device ran; see
+[releasing without one](technotes.md#releasing-without-one).
 
 The same URL works through `UV_PYTHON_DOWNLOADS_JSON_URL` or the
 `python-downloads-json-url` key in `uv.toml`.
@@ -73,7 +72,7 @@ interpreter reports its real identity:
 $ python -c "import sysconfig; print(sysconfig.get_config_var('SOABI'))"
 cpython-314-aarch64-linux-android
 $ python -c "import sysconfig; print(sysconfig.get_platform())"
-android-24-arm64_v8a
+android-34-arm64_v8a
 ```
 
 ## Directly
@@ -104,15 +103,14 @@ to a host-private directory.
 ## CA certificates and time zones
 
 Bionic has no `/etc/ssl/certs` and no `/usr/share/zoneinfo`, so a stock CPython
-finds an empty trust store and no time zone database.
+finds an empty trust store and no time zone database. See
+[Android Quirks](quirks.md#runtime-data-ca-certificates-and-time-zones) for why,
+and for what each build does about it.
 
 The flagship build compiles in Termux's trust store, so HTTPS works out of the
-box under Termux, overridable with `SSL_CERT_FILE` and `SSL_CERT_DIR`.
-
-It leaves the time zone path at CPython's default, as upstream does, because
-Termux ships no zoneinfo tree. `zoneinfo` falls back to the `tzdata` package the
-same way it does on a Linux host without system zoneinfo, so install `tzdata`,
-set `PYTHONTZPATH`, or use the data product.
+box under Termux, overridable with `SSL_CERT_FILE` and `SSL_CERT_DIR`. It leaves
+the time zone path at CPython's default, so install `tzdata`, set `PYTHONTZPATH`,
+or use the data product.
 
 The `upstream` build cannot compile anything in — the official package is
 consumed as-is. Install the data product from the `android-data-*` release track

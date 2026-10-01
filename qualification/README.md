@@ -9,8 +9,9 @@ qualification/<tag>/cpython-<version>-<triple>[-<build option>].json
 ```
 
 The release workflow refuses to publish a build unless a receipt here covers
-every artifact in the release by SHA-256. A receipt is evidence only for the
-bytes it names.
+every artifact in the release by SHA-256, or the release is made [without
+one](../docs/technotes.md#releasing-without-one) and says so. A receipt is
+evidence only for the bytes it names.
 
 The name mirrors the artifact stem without the tag, which the directory already
 carries, so a listing says which Python each receipt qualified. Nothing depends

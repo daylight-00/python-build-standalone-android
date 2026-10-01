@@ -3,9 +3,8 @@
 ## Status
 
 Two releases are published. `20260729` is current and carries both builds;
-`20260728` carries `upstream` alone. The earlier one is superseded and left in
-place — a published name has to keep serving the bytes it was published with,
-because the uv catalog pins them by hash.
+`20260728` carries `upstream` alone and is superseded, but left in place; see
+[Targets and build options](technotes.md#targets-and-build-options).
 
 Publishing is gated on a device qualification receipt covering every artifact in
 the release by SHA-256, and the receipts are committed under
@@ -13,14 +12,13 @@ the release by SHA-256, and the receipts are committed under
 for the bytes it names, so what follows describes the artifacts a release
 actually shipped rather than the project in general.
 
-A release may also be published without one, so that following a new CPython
-does not wait for a device. Such a release is marked as a prerelease, says so at
-the top of its notes together with what it does and does not stand on — whether
-nothing but the pinned CPython input changed since the last release a device ran,
-or this project's own files did, or no device ever ran the build — and does
-**not** become what `uv python install` resolves to: the catalogs keep pointing
-at the last qualified release. So the scope below describes qualified releases; a
-prerelease is what it says on its own notes. See
+A release may also be published without a receipt, so that following a new
+CPython does not wait for a device. It is then a prerelease, and the top of its
+notes says what it stands on: only the pinned CPython input differing from the
+last release a device ran, anything beyond it differing, or no device ever
+having run the build. The catalogs keep pointing at the last qualified release,
+so `uv python install` never resolves to it. The scope below describes qualified
+releases; a prerelease is what its own notes say. See
 [releasing without one](technotes.md#releasing-without-one).
 
 The predecessor research repository qualified equivalent artifacts on real
@@ -44,10 +42,10 @@ covers it, and this table gains a row when it ships.
 always a build whose device coverage is upstream's responsibility rather than
 this project's, and it stays as long as the official package does.
 
-Neither minimum is chosen here, which means either can move without a decision
-in this repository — if upstream raises its floor, or a future CPython adds a
-configure check for a higher-API function. A floor change is called out
-prominently in the release notes.
+Neither minimum is chosen here, so either can move without a decision in this
+repository: upstream may raise its floor, or a future CPython may add a
+configure check for a higher-API function. The release notes call a floor change
+out prominently.
 
 A minimum API is a build floor. A build floor is not a device validation: a
 distribution compiled for API 24 is expected to run on Android 7, but that is a
@@ -78,7 +76,7 @@ These are deliberate boundaries, not gaps waiting to be filled:
 ## Runtime contexts
 
 Termux on `arm64-v8a` is the context the distributions are designed for and the
-one every release is qualified against. The flagship build compiles in
+one every device qualification runs against. The flagship build compiles in
 Termux's CA and time zone paths as overridable defaults for that reason.
 
 That is a convenience, not a dependency: the runtime needs no Termux prefix and
@@ -92,10 +90,7 @@ Report problems on the [issue tracker][issues]. A useful report states the build
 option, the release tag, the archive flavor, the Android version, and the
 runtime context.
 
-Security issues follow [`SECURITY.md`](../SECURITY.md).
-
-CPython security fixes are upstream's; this project consumes them by rebuilding
-from a new upstream release. The project owns the packaging, the loader
-normalization, and the release integrity.
+Security issues follow [`SECURITY.md`](../SECURITY.md), which also says who owns
+which surface.
 
 [issues]: https://github.com/daylight-00/python-build-standalone-android/issues

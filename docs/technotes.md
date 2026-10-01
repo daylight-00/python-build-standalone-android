@@ -1,7 +1,6 @@
 # Technical Notes
 
-Why this repository builds what it builds, and how. Design questions are
-settled in [cpython-android-cli][research] and arrive here as recipes.
+Why this repository builds what it builds, and how.
 
 ## What this repository is
 
@@ -168,9 +167,9 @@ that exists. Everything the interpreter build itself does is upstream's.
 The dependencies are built from upstream's own recipes, pinned at one commit,
 with two recorded overrides: the NDK revision, so the dependencies and the
 interpreter share a toolchain, and `openssldir`. Two more overrides exist for
-reproducibility rather than for behaviour, and are covered under
-[reproducibility](distributions.md#reproducibility): the file prefix map, and naming the tools
-without their directory.
+reproducibility rather than for behavior, and are covered under
+[reproducibility](distributions.md#reproducibility): the file prefix map, and
+naming the tools without their directory.
 
 What each component installs is taken as it comes, with one exception. A
 component's pkg-config file records the directory that component was configured
@@ -263,12 +262,13 @@ $ ./update-pins.py --write    # move the pins to the newest patch of the series
 
 A weekly workflow runs it and opens a pull request when the series has moved. It
 opens a request rather than committing, because the point of the automation is to
-notice rather than to decide. From there everything is automatic: the build
-workflow builds and validates the request, and the api-level workflow re-measures
-the floor because `config/**` changed. Only taking the resulting release out of
+notice rather than to decide. From there the build workflow builds and validates
+the request, and the api-level workflow re-measures the floor because `config/**`
+changed. Once it is merged, [releasing unattended](#releasing-unattended) can
+carry on if it has been turned on; only taking the resulting release out of
 prerelease needs a device.
 
-A patch bump is exactly the case [the waiver](#releasing-without-one) covers —
+A patch bump is exactly the case [the waiver](#releasing-without-one) covers:
 the pinned bytes move and nothing this project owns does.
 
 New series are a separate decision, not something this follows. `upstream` cannot
@@ -278,8 +278,9 @@ series, and every series added costs a device qualification per release forever.
 ## Release model
 
 Releases are manual, as upstream: `workflow_dispatch` with an explicit tag and
-commit, gated on a protected environment. There is no automatic release on
-green. The one exception is opt-in and off by default — see
+commit, through the `release` environment, which is where a person is asked to
+approve once it has required reviewers. There is no automatic release on green.
+The one exception is opt-in and off by default — see
 [releasing unattended](#releasing-unattended).
 
 `dry-run` defaults to true. A release is the one action in this repository that
@@ -289,8 +290,8 @@ Every release carries `SHA256SUMS`, per-component license texts inside each
 archive, build provenance attestations, generated release notes, and a
 `download-metadata.json` catalog per build option. The release is created as a
 draft and only published once every asset is uploaded, so a catalog never points
-at an empty release. The `latest-release` branch then publishes the catalogs and
-a `latest-release.json` pointer at stable raw URLs.
+at an empty release. For a qualified release, the `latest-release` branch then
+publishes the catalogs and a `latest-release.json` pointer at stable raw URLs.
 
 Release notes are generated from the build receipts rather than written by hand,
 because they have to state the minimum Android API per build. That floor is
@@ -304,19 +305,20 @@ run? — cannot happen there. `qualify.py` runs on a device against a built
 archive and writes a receipt recording what it found: interpreter identity,
 every module `configure` said it built importing, every shared library
 `dlopen`ed, a subprocess spawned, `pip` and `venv` exercised, and the whole
-prefix copied to a deeper path and re-checked. It uses only the standard library, because a device is not
-guaranteed to have anything else, and it never raises: a probe that cannot even
-start is recorded as a failure rather than losing the receipt.
+prefix copied to a deeper path and re-checked. It uses only the standard
+library, because a device is not guaranteed to have anything else, and it never
+raises: a probe that cannot even start is recorded as a failure rather than
+losing the receipt.
 
 Receipts are committed under `qualification/<tag>/cpython-<version>-<build>.json`
 — named after the artifact stem, so a directory says which Python each receipt
 qualified without opening it — and the release workflow refuses to publish unless
 one covers **every artifact in the release by SHA-256**, or the waiver is allowed
 and the release goes out as a prerelease that says it has none
-([below](#releasing-without-one)). A receipt is evidence only for the bytes it names, so one produced
-against an earlier build cannot be carried forward silently. The gate also
-checks that the device's ABI is one this project releases for and that the
-interpreter reported the API level the build declares.
+([below](#releasing-without-one)). A receipt is evidence only for the bytes it
+names, so one produced against an earlier build cannot be carried forward
+silently. The gate also checks that the device's ABI is one this project
+releases for and that the interpreter reported the API level the build declares.
 
 ### Releasing without one
 
@@ -325,9 +327,9 @@ thing standing between this project and a release that follows a new CPython on
 its own. `allow-waiver` opens it, and does so without weakening what a receipt
 means — nothing claims an older one covers newer bytes.
 
-What it does is publish on a claim sized to what is actually known, and say which.
-The gate records one of three footings, strongest first, and the release notes open
-with the caution that matches it:
+What it does is publish on a claim sized to what is actually known, and say
+which. The gate records one of three footings, strongest first, and the release
+notes open with the caution that matches it:
 
 | Footing | When | What the notes claim |
 | --- | --- | --- |
@@ -337,12 +339,12 @@ with the caution that matches it:
 
 Only the first is a waiver in the sense of resting on an earlier receipt. If the
 only difference is the pinned CPython input, then the launcher, the loader
-normalization, the metadata overlay, the curation and the licence set are the same
-code that was qualified, and the residual risk belongs to upstream. In the other
-two the risk may be this project's own, and the notes say that the code which
-assembled the interpreter is not known to be the code a device ran. What CI checks
-is the same in all three: every archive is byte-reproducible and holds to the
-distribution contract.
+normalization, the metadata overlay, the curation and the license set are the
+same code that was qualified, and the residual risk belongs to upstream. In the
+other two the risk may be this project's own, and the notes say that the code
+which assembled the interpreter is not known to be the code a device ran. What CI
+checks is the same in all three: every archive is byte-reproducible and holds to
+the distribution contract.
 
 The second and third used to be refusals. A refusal meant the first commit to
 touch anything but a pin ended unattended releases until somebody found a device,
@@ -357,12 +359,13 @@ in effect — an NDK bump changes every compiled byte and can move the API floor
 And a floor that moved drops it by itself, because a different floor means a
 different set of devices, which no amount of unchanged packaging stands in for.
 
-What a release without a receipt is not is the default. It is published as a
+A release without a receipt never becomes the default. It is published as a
 prerelease, its notes open with the fact, and `latest-release` and the uv catalogs
-are left pointing at the last qualified release — so `uv python install` keeps
-resolving to bytes a device ran, and taking one is an explicit act. Promoting one
-means qualifying those exact artifacts, committing the receipt, and re-releasing
-without the waiver.
+are left pointing at the last qualified release, so `uv python install` keeps
+resolving to bytes a device ran and taking one is an explicit act. A published tag
+cannot be released again, so promoting means qualifying a build of the same
+inputs on a device under a fresh tag, committing the receipt, and releasing that
+tag without the waiver.
 
 The verdict travels with the artifacts as `<build>.qualification.json`, footing
 and reason included, rather than being inferred from what the operator asked for:
@@ -381,16 +384,16 @@ nothing while every pinned version has a release, while a release is already
 running, or once today's tag is taken. A release that failed is attempted again
 the next morning.
 
-A release cannot be taken back, so there are two brakes, and both are off until
-someone chooses otherwise. The repository variable `AUTO_RELEASE` has to be
-`true`; until it is, the workflow does nothing at all.
+A release cannot be taken back, so there are two brakes. The repository variable
+`AUTO_RELEASE` has to be `true`; until it is, the workflow does nothing at all.
 
 ```console
 $ gh variable set AUTO_RELEASE --body true
 ```
 
-And the `release` environment gates the release workflow itself, so giving it
-required reviewers puts a person back in the loop without touching anything else.
+The other is the `release` environment, which gates the release workflow itself.
+It has no required reviewers today, so it asks nobody; giving it some puts a person
+back in the loop without touching anything else.
 
 What is still manual is merging the pull request that `update-pins` opens, and
 everything that needs a device: a release this produces is a prerelease until
@@ -408,26 +411,16 @@ device, and there uv reports `linux` with no libc:
 cpython-3.14.6-linux-aarch64-none
 ```
 
-Every build option collides on that one key, so each publishes its own catalog:
-
-```
-download-metadata.json            the flagship build
-download-metadata-upstream.json   the baseline build
-```
-
-```console
-$ uv python install cpython-3.14.6-linux-aarch64-none \
-    --python-downloads-json-url https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/latest-release/download-metadata.json
-```
-
-`UV_PYTHON_DOWNLOADS_JSON_URL` and the `python-downloads-json-url` key in
-`uv.toml` work equally well. Because the catalog claims `linux`, an installed
-interpreter should be re-probed to confirm Android identity; it reports
-`SOABI cpython-314-aarch64-linux-android`, `MULTIARCH aarch64-linux-android`,
-and the `android-{api}-arm64_v8a` platform.
+Every build option collides on that one key, so each publishes its own catalog,
+`download-metadata.json` for the flagship and `download-metadata-upstream.json`
+for the baseline; [running](running.md#with-uv) has the command. Because the
+catalog claims `linux`, an installed interpreter should be re-probed to confirm
+Android identity. It reports `SOABI cpython-314-aarch64-linux-android`,
+`MULTIARCH aarch64-linux-android`, and the `android-{api}-arm64_v8a` platform.
 
 Upstream uv has no built-in Android catalog and this project does not claim one.
 
-
 [pbs]: https://github.com/astral-sh/python-build-standalone
 [research]: https://github.com/daylight-00/cpython-android-cli
+[bionic-status]: https://android.googlesource.com/platform/bionic/+/refs/heads/main/docs/status.md
+[ndk-custom]: https://github.com/HomuHomu833/android-ndk-custom

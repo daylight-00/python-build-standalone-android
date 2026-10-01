@@ -27,6 +27,11 @@ A build is named `triple` or `triple:build-option`; naming the triple alone
 selects the flagship. `ci-targets.yaml` is the list of what exists, and
 `./ci-matrix.py` prints it.
 
+Upstream takes `--target-triple`, `--options` and `--python` instead. Here the
+build option is part of the name because that table enumerates builds that way,
+and there is no `--python` because the version is not an input: it comes from
+the input lock, which names it in its path and again in its contents.
+
 Three archives and a build receipt land in `dist/`. The receipt records the
 inputs, the toolchain, every mutation, and the SHA-256 of each archive; it is
 what `check-qualification.py`, `generate-catalog.py`, and `release-notes.py`
@@ -44,8 +49,9 @@ $ ./validate-distribution.py dist/*.tar.zst dist/*.tar.gz
 
 This holds a finished archive to the distribution contract: the `PYTHON.json`
 schema upstream's own reader enforces, the extension modules CPython says it
-built, the licence texts, and the member paths. CI runs it on every build, and
-it works just as well on an archive downloaded from a release.
+built, the license texts against the manifest, and the member paths. CI runs it
+on every build, and it works just as well on an archive downloaded from a
+release.
 
 Reproducibility is a property of the build, so proving it takes two:
 
@@ -53,8 +59,8 @@ Reproducibility is a property of the build, so proving it takes two:
 $ just build-reproducible aarch64-linux-android 20260729
 ```
 
-CI additionally runs the second build under a different umask, because repeating
-a build under identical conditions proves much less than it appears to.
+CI also runs the second build under a different umask; see
+[Reproducibility](distributions.md#reproducibility).
 
 ## Qualifying on a device
 
@@ -64,13 +70,20 @@ Python 3:
 
 ```console
 $ python3 qualify.py cpython-3.14.6+20260729-…-install_only_stripped.tar.gz \
-    --expected-api 34 -o aarch64-linux-android.json
+    --also-binds cpython-3.14.6+20260729-…-full.tar.zst \
+                 cpython-3.14.6+20260729-…-install_only.tar.gz \
+    --expected-api 34 --builtin-runtime-data -o aarch64-linux-android.json
 ```
 
+`--also-binds` names the other archives of the build, so that the receipt covers
+all three, and `--builtin-runtime-data` asks the flagship to resolve the trust
+store it compiled in. [`qualification/README.md`](../qualification/README.md) has
+the exact commands for each build.
+
 The receipt it writes binds its findings to the exact archive bytes. Commit it
-under `qualification/<tag>/cpython-<version>-<build>.json`; the release workflow
-refuses to
-publish unless one covers every artifact by SHA-256. `check-qualification.py`
+under `qualification/<tag>/cpython-<version>-<build>.json`. The release workflow
+refuses to publish unless one covers every artifact by SHA-256, or the release is
+made [without one](technotes.md#releasing-without-one). `check-qualification.py`
 answers whether a committed receipt covers what you just built.
 
 ## Checks
@@ -91,7 +104,7 @@ $ ./update-pins.py --write    # move both builds to the newest patch
 ```
 
 One version directory on python.org serves both builds, and the dependency set is
-re-read from the new source rather than carried over. See
+re-read from the new source rather than carried over; see
 [following upstream](technotes.md#following-upstream). A weekly workflow does
 this and opens a pull request.
 
@@ -114,5 +127,6 @@ CPython or NDK pin changes, and weekly.
 ## Releasing
 
 Releases are manual and gated: `workflow_dispatch` with an explicit tag and
-commit, a protected environment, and `dry-run` defaulting to true. See
-[Release model](technotes.md#release-model).
+commit, the `release` environment, and `dry-run` defaulting to true. The one
+exception, [releasing unattended](technotes.md#releasing-unattended), is off
+until opted into. See [Release model](technotes.md#release-model).

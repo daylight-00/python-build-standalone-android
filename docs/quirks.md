@@ -69,8 +69,9 @@ What the two builds resolve on a device, with nothing set:
 | CA certificates loaded | **119** | **0** |
 | Time zone directories present | none | none |
 
-Both figures come from the committed qualification receipts. The trust store is
-the whole difference the source build buys, and 119 against 0 is the size of it.
+Both figures come from the committed qualification receipts. The two builds
+differ on the trust store, 119 against 0; the source build's other advantage,
+speed, is measured in [the technical notes](technotes.md#why-a-source-build-is-worth-having).
 
 Using Android's own system CA and tz databases belongs to `extended` or beyond,
 and is still under research.
@@ -99,7 +100,3 @@ INSTALL_ROOT   immutable, relocatable
 DATA_ROOT      independently updateable CA and time zone payloads
 STATE_ROOT     caller-owned cache, temp, user-site, and venv state
 ```
-
-
-[pbs]: https://github.com/astral-sh/python-build-standalone
-[research]: https://github.com/daylight-00/cpython-android-cli
