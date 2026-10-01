@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """Refuse a release whose artifacts have not been qualified on a device.
 
     ./check-qualification.py --target aarch64-linux-android:upstream --tag 20260727
@@ -21,9 +21,12 @@ import argparse
 import sys
 from pathlib import Path
 
+import yaml
+
 from pythonbuild import waiver
 from pythonbuild.qualification import (
     QUALIFICATION_ROOT,
+    NoReceiptError,
     QualificationError,
     previous_qualified_tag,
     shipped_api_levels,
@@ -76,18 +79,31 @@ def _record(
 
 
 def changed_since(tag: str) -> list[str]:
-    """Every tracked path that differs between ``tag`` and the working tree.
+    """Every tracked path that differs between ``tag`` and ``HEAD``.
 
     git is the record of what this project changed; nothing has to be committed
-    alongside a receipt for the comparison to be possible.
+    alongside a receipt for the comparison to be possible. Renames are reported as
+    a deletion and an addition, so that moving a file out of a path the waiver
+    allows does not hide where it came from.
     """
-    result = run(["git", "diff", "--name-only", f"{tag}..HEAD"])
+    result = run(["git", "diff", "--name-only", "--no-renames", f"{tag}..HEAD"])
     if result.returncode:
         raise QualificationError(
             f"cannot compare against {tag}: {result.stderr.strip()}\n"
             f"The release checkout needs the tag and its history — fetch-depth: 0."
         )
     return [line for line in result.stdout.splitlines() if line]
+
+
+def ci_targets_follow_pins(tag: str) -> bool:
+    """Whether ``ci-targets.yaml`` moved since ``tag`` only as far as the pins."""
+    documents = []
+    for revision in (tag, "HEAD"):
+        result = run(["git", "show", f"{revision}:ci-targets.yaml"])
+        if result.returncode:
+            return False
+        documents.append(yaml.safe_load(result.stdout))
+    return waiver.pins_only(*documents)
 
 
 def _git_tag_exists(tag: str) -> bool:
@@ -112,18 +128,22 @@ def previous_released_qualified_tag(
 
 
 def consider_waiver(
-    build: Build, tag: str, refusal: QualificationError, report: Path | None
+    build: Build, tag: str, absent: NoReceiptError, report: Path | None
 ) -> int:
     """Let a release with no receipt of its own go out, and record what it stands on.
 
-    Nothing here refuses: an unattended release that waited for a device would
-    not be unattended. What varies is the claim. Only a change that is upstream's
-    alone earns the waiver proper; anything else is published all the same, as a
-    prerelease whose notes say which footing it is on.
+    Nothing here refuses for want of a receipt: an unattended release that waited
+    for a device would not be unattended. What varies is the claim. Only a change
+    that is upstream's alone earns the waiver proper; anything else is published
+    all the same, as a prerelease whose notes say which footing it is on.
+
+    It is reached only when no receipt exists. A receipt that does exist and
+    disagrees with these bytes is a refusal that no footing stands in for.
     """
     previous = previous_released_qualified_tag(tag)
     levels = shipped_api_levels(previous) if previous else {}
-    changed: list[str] = []
+    waived: list[str] = []
+    blocking: list[str] = []
     floor: int | None = None
 
     if previous is None:
@@ -136,24 +156,31 @@ def consider_waiver(
             f"has never run on a device"
         )
     else:
+        changed = changed_since(previous)
         assessment = waiver.assess(
             previous_tag=previous,
             previous_api_level=levels[build.artifact_infix],
             declared_api_level=build.android_api.level,
-            changed_paths=changed_since(previous),
+            changed_paths=changed,
+            also_waivable=(
+                frozenset({"ci-targets.yaml"})
+                if "ci-targets.yaml" in changed and ci_targets_follow_pins(previous)
+                else frozenset()
+            ),
         )
         basis = assessment.basis
         reason = assessment.reason()
-        changed = list(assessment.waived)
+        waived = list(assessment.waived)
+        blocking = list(assessment.blocking)
         if assessment.granted:
             floor = assessment.declared_api_level
 
     print(f"qualification gate: NOT QUALIFIED for {build.name} at {tag}")
-    print(f"  receipt   {str(refusal).splitlines()[0]}")
+    print(f"  receipt   {str(absent).splitlines()[0]}")
     print("  this release is not device-qualified and goes out as a prerelease")
     print(f"  basis     {basis}: {reason}")
     if floor is not None:
-        print(f"  changed   {', '.join(changed) or 'nothing'}")
+        print(f"  changed   {', '.join(waived) or 'nothing'}")
         print(f"  floor     API {floor}, unchanged")
     _record(
         report,
@@ -165,7 +192,8 @@ def consider_waiver(
                 "basis": basis,
                 "previous_tag": previous,
                 "reason": reason,
-                "changed": changed,
+                "waived": waived,
+                "blocking": blocking,
             }
         },
     )
@@ -201,11 +229,15 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         result = verify(build, args.tag, artifacts)
+    except NoReceiptError as error:
+        if args.allow_waiver:
+            return consider_waiver(build, args.tag, error, args.report)
+        print(f"qualification gate: REFUSED\n\n{error}", file=sys.stderr)
+        return 1
     except QualificationError as error:
-        if not args.allow_waiver:
-            print(f"qualification gate: REFUSED\n\n{error}", file=sys.stderr)
-            return 1
-        return consider_waiver(build, args.tag, error, args.report)
+        # Evidence against the release, not the lack of any: no footing stands in.
+        print(f"qualification gate: REFUSED\n\n{error}", file=sys.stderr)
+        return 1
 
     device = result["device"]
     interpreter = result["interpreter"]

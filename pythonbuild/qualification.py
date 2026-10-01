@@ -128,6 +128,15 @@ class QualificationError(RuntimeError):
     """The release must not proceed."""
 
 
+class NoReceiptError(QualificationError):
+    """No device ever ran these bytes at this tag, which is not the same as failing.
+
+    The only refusal a waiver may stand in for. A receipt that exists and says the
+    device failed, or covers other bytes, or reports another floor, is evidence
+    against the release and nothing downgrades it.
+    """
+
+
 def _version_of(artifacts: dict[str, dict[str, Any]]) -> str:
     """The Python version these artifacts are of, read off their names."""
     for record in artifacts.values():
@@ -180,7 +189,7 @@ def verify(
         expected = receipt_path(build, tag, python_version, root)
         present = sorted(p.name for p in (root / tag).glob("*.json"))
         holds = f"\n{_display_path(root / tag)} holds: {present}" if present else ""
-        raise QualificationError(
+        raise NoReceiptError(
             f"no device qualification receipt for {build.name} {python_version} "
             f"at {tag}.\n"
             f"Run qualify.py on a device and commit the result to "

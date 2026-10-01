@@ -7,7 +7,7 @@ An unattended release goes out without one, and the claim it makes depends on
 how far it is from the last build a device ran. If the only thing that differs
 is the pinned CPython input, then every part of the distribution this project is
 responsible for — the launcher, the loader normalization, the metadata overlay,
-the curation, the licence set — is the same code that was qualified, and the
+the curation, the license set — is the same code that was qualified, and the
 residual risk is upstream's. That is the strongest claim available without a
 device, and it is the only one that is a *waiver*: ``UPSTREAM_ONLY``.
 
@@ -30,8 +30,10 @@ anything under ``pythonbuild/``, the scripts, ``licenses/``, ``uv.lock``
 
 from __future__ import annotations
 
+import copy
 import fnmatch
 from dataclasses import dataclass
+from typing import Any
 
 # What an unqualified release stands on, strongest claim first.
 UPSTREAM_ONLY = "upstream-only"
@@ -49,11 +51,9 @@ WAIVABLE = (
     # the ones the pinned CPython's Android/android.py names, so it moves with
     # the CPython pin rather than independently.
     "config/source/dependency-recipes.lock.json",
-    # The declared API floor follows the pins through a measurement.
-    "ci-targets.yaml",
-    # Receipts accumulate; a new one cannot invalidate a build.
+    # Receipts accumulate; a new one cannot invalidate a build. fnmatch's `*`
+    # crosses `/`, so this covers the per-tag directories too.
     "qualification/*",
-    "qualification/*/*",
     # Prose.
     "docs/*",
     "*.md",
@@ -101,16 +101,46 @@ def is_waivable(path: str) -> bool:
     return any(fnmatch.fnmatch(path, pattern) for pattern in WAIVABLE)
 
 
+def pins_only(before: dict[str, Any], after: dict[str, Any]) -> bool:
+    """Whether two parsed ``ci-targets.yaml`` differ in nothing but the pins.
+
+    The file is not waivable as a path: it says what each build compiles in, so a
+    changed ``openssldir`` or producer changes bytes the same way a code change
+    does. What follows CPython is the input lock a build reads and the API floor
+    measured from it; the floor's level is compared on its own, so blanking it here
+    does not let a moved floor through.
+    """
+
+    def stripped(document: dict[str, Any]) -> dict[str, Any]:
+        result = copy.deepcopy(document)
+        for triple in result.get("android", {}).values():
+            for build in triple.get("build_options", {}).values():
+                build.pop("input_lock", None)
+                build.get("android_api", {}).pop("level", None)
+        return result
+
+    return stripped(before) == stripped(after)
+
+
 def assess(
     *,
     previous_tag: str,
     previous_api_level: int,
     declared_api_level: int,
     changed_paths: list[str],
+    also_waivable: frozenset[str] = frozenset(),
 ) -> Waiver:
-    """Decide whether the difference since ``previous_tag`` is upstream's alone."""
-    blocking = tuple(sorted(path for path in changed_paths if not is_waivable(path)))
-    waived = tuple(sorted(path for path in changed_paths if is_waivable(path)))
+    """Decide whether the difference since ``previous_tag`` is upstream's alone.
+
+    ``also_waivable`` names paths a caller has shown, by looking inside them, to
+    have moved only as far as the pins.
+    """
+
+    def allowed(path: str) -> bool:
+        return is_waivable(path) or path in also_waivable
+
+    blocking = tuple(sorted(path for path in changed_paths if not allowed(path)))
+    waived = tuple(sorted(path for path in changed_paths if allowed(path)))
     return Waiver(
         previous_tag=previous_tag,
         previous_api_level=previous_api_level,
@@ -129,4 +159,5 @@ __all__ = [
     "Waiver",
     "assess",
     "is_waivable",
+    "pins_only",
 ]

@@ -17,30 +17,65 @@ from pythonbuild.waiver import (
     UPSTREAM_ONLY,
     assess,
     is_waivable,
+    pins_only,
 )
 
-PINS = [
+PIN_FILES = [
     "config/source/cpython-3.14.7.lock.json",
     "config/upstream/cpython-3.14.7-aarch64-linux-android.lock.json",
     "config/source/dependency-recipes.lock.json",
-    "ci-targets.yaml",
 ]
+# What a pin bump changes: the locks, and the table that names them.
+PINS = [*PIN_FILES, "ci-targets.yaml"]
 
 
-def waiver(changed: list[str], *, previous: int = 34, declared: int = 34):
+def waiver(
+    changed: list[str],
+    *,
+    previous: int = 34,
+    declared: int = 34,
+    targets_follow_pins: bool = True,
+):
     return assess(
         previous_tag="20260729",
         previous_api_level=previous,
         declared_api_level=declared,
         changed_paths=changed,
+        also_waivable=(
+            frozenset({"ci-targets.yaml"}) if targets_follow_pins else frozenset()
+        ),
     )
+
+
+def targets(
+    *, lock: str = "cpython-3.14.6", level: int = 34, openssldir: str = "/a"
+) -> dict:
+    return {
+        "android": {
+            "aarch64-linux-android": {
+                "build_options": {
+                    "default": {
+                        "producer": "cpython-source",
+                        "input_lock": f"config/source/{lock}.lock.json",
+                        "runtime_data": {"openssldir": openssldir},
+                        "android_api": {"level": level, "policy": "a-rule"},
+                    }
+                }
+            }
+        }
+    }
 
 
 class WaivablePathTest(unittest.TestCase):
     def test_the_cpython_pins_may_move(self) -> None:
-        for path in PINS:
+        for path in PIN_FILES:
             with self.subTest(path=path):
                 self.assertTrue(is_waivable(path))
+
+    def test_the_target_table_is_not_waivable_as_a_path(self) -> None:
+        # It says what each build compiles in; whether it moved only as far as the
+        # pins is a question about its contents.
+        self.assertFalse(is_waivable("ci-targets.yaml"))
 
     def test_prose_and_receipts_may_move(self) -> None:
         for path in ("docs/technotes.md", "README.md", "qualification/20260730/x.json"):
@@ -119,6 +154,42 @@ class AssessTest(unittest.TestCase):
         found = waiver([*PINS, "pythonbuild/assemble.py"])
         self.assertIn("ci-targets.yaml", found.waived)
         self.assertNotIn("pythonbuild/assemble.py", found.waived)
+
+    def test_a_target_table_that_moved_beyond_the_pins_blocks_it(self) -> None:
+        found = waiver(PINS, targets_follow_pins=False)
+        self.assertFalse(found.granted)
+        self.assertEqual(found.blocking, ("ci-targets.yaml",))
+
+
+class PinsOnlyTest(unittest.TestCase):
+    """The target table follows CPython only through the lock and the floor."""
+
+    def test_a_bump_moves_the_lock_and_the_measured_floor(self) -> None:
+        self.assertTrue(pins_only(targets(), targets(lock="cpython-3.14.7", level=35)))
+
+    def test_nothing_moved(self) -> None:
+        self.assertTrue(pins_only(targets(), targets()))
+
+    def test_what_a_build_compiles_in_is_not_a_pin(self) -> None:
+        self.assertFalse(pins_only(targets(), targets(openssldir="/b")))
+
+    def test_the_rule_behind_the_floor_is_not_a_pin(self) -> None:
+        moved = targets()
+        moved["android"]["aarch64-linux-android"]["build_options"]["default"][
+            "android_api"
+        ]["policy"] = "another-rule"
+        self.assertFalse(pins_only(targets(), moved))
+
+    def test_a_new_build_is_not_a_pin(self) -> None:
+        added = targets()
+        added["android"]["aarch64-linux-android"]["build_options"]["extra"] = {}
+        self.assertFalse(pins_only(targets(), added))
+
+    def test_the_arguments_are_left_alone(self) -> None:
+        before, after = targets(), targets(lock="cpython-3.14.7")
+        pins_only(before, after)
+        self.assertEqual(before, targets())
+        self.assertEqual(after, targets(lock="cpython-3.14.7"))
 
 
 if __name__ == "__main__":

@@ -86,6 +86,7 @@ class UnqualifiedReleaseTest(unittest.TestCase):
         levels: dict[str, int],
         changed: list[str],
         api_level: int = 34,
+        targets_follow_pins: bool = True,
     ) -> tuple[int, dict[str, Any]]:
         function = SCRIPT["consider_waiver"]
         build = make_build(api_level=api_level)
@@ -99,11 +100,12 @@ class UnqualifiedReleaseTest(unittest.TestCase):
                         "previous_released_qualified_tag": lambda tag: previous,
                         "shipped_api_levels": lambda tag: levels,
                         "changed_since": lambda tag: changed,
+                        "ci_targets_follow_pins": lambda tag: targets_follow_pins,
                     },
                 ),
             ):
                 code = function(
-                    build, "20260814", SCRIPT["QualificationError"]("x"), report
+                    build, "20260814", SCRIPT["NoReceiptError"]("x"), report
                 )
             return code, json.loads(report.read_text(encoding="utf-8"))
 
@@ -117,7 +119,8 @@ class UnqualifiedReleaseTest(unittest.TestCase):
         self.assertFalse(verdict["device_qualified"])
         self.assertEqual(verdict["waiver"]["basis"], "upstream-only")
         self.assertEqual(verdict["waiver"]["previous_tag"], "20260729")
-        self.assertIn("docs/status.md", verdict["waiver"]["changed"])
+        self.assertIn("docs/status.md", verdict["waiver"]["waived"])
+        self.assertEqual(verdict["waiver"]["blocking"], [])
 
     def test_a_change_to_the_project_is_published_on_a_weaker_claim(self) -> None:
         # This used to be a refusal, which meant no release could go out
@@ -131,6 +134,20 @@ class UnqualifiedReleaseTest(unittest.TestCase):
         self.assertFalse(verdict["device_qualified"])
         self.assertEqual(verdict["waiver"]["basis"], "changed")
         self.assertIn("pythonbuild/assemble.py", verdict["waiver"]["reason"])
+        self.assertEqual(verdict["waiver"]["blocking"], ["pythonbuild/assemble.py"])
+
+    def test_a_target_table_that_moved_beyond_the_pins_is_not_a_pin(self) -> None:
+        # ci-targets.yaml says what a build compiles in, so changing it changes
+        # bytes. Only a file that moved no further than the pins is waivable.
+        code, verdict = self.consider(
+            previous="20260729",
+            levels={"aarch64-linux-android": 34},
+            changed=list(self.PINS),
+            targets_follow_pins=False,
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(verdict["waiver"]["basis"], "changed")
+        self.assertEqual(verdict["waiver"]["blocking"], ["ci-targets.yaml"])
 
     def test_a_moved_floor_is_a_weaker_claim_too(self) -> None:
         code, verdict = self.consider(
@@ -158,6 +175,102 @@ class UnqualifiedReleaseTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(verdict["waiver"]["basis"], "never-run")
         self.assertIsNone(verdict["waiver"]["previous_tag"])
+
+
+class GateTest(unittest.TestCase):
+    """What ``--allow-waiver`` may and may not stand in for."""
+
+    def run_gate(
+        self, raises: Exception, *argv: str
+    ) -> tuple[int, dict[str, Any] | None, io.StringIO]:
+        """The exit code, the verdict it recorded (if any), and what it said."""
+        main = SCRIPT["main"]
+        stderr = io.StringIO()
+        with TemporaryDirectory() as tmp:
+            dist = Path(tmp)
+            (
+                dist / "cpython-3.14.7+20260814-aarch64-linux-android.build.json"
+            ).write_text(
+                json.dumps(
+                    {
+                        "flavors": {
+                            "full": {
+                                "artifact": {
+                                    "filename": "cpython-3.14.7+20260814-aarch64-linux-android-full.tar.zst",
+                                    "sha256": "f" * 64,
+                                }
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = dist / "verdict.json"
+
+            def refuse(*args: Any, **kwargs: Any) -> None:
+                raise raises
+
+            with (
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(stderr),
+                mock.patch.dict(
+                    main.__globals__,
+                    {
+                        "verify": refuse,
+                        "previous_released_qualified_tag": lambda tag: None,
+                    },
+                ),
+            ):
+                code = main(
+                    [
+                        "--target",
+                        "aarch64-linux-android",
+                        "--tag",
+                        "20260814",
+                        "--dist-dir",
+                        str(dist),
+                        "--report",
+                        str(report),
+                        *argv,
+                    ]
+                )
+            verdict = (
+                json.loads(report.read_text(encoding="utf-8"))
+                if report.exists()
+                else None
+            )
+            return code, verdict, stderr
+
+    def test_no_receipt_is_refused_without_the_flag(self) -> None:
+        code, verdict, stderr = self.run_gate(SCRIPT["NoReceiptError"]("none"))
+        self.assertEqual(code, 1)
+        self.assertIsNone(verdict)
+        self.assertIn("REFUSED", stderr.getvalue())
+
+    def test_no_receipt_is_published_unqualified_with_the_flag(self) -> None:
+        code, verdict, _ = self.run_gate(
+            SCRIPT["NoReceiptError"]("none"), "--allow-waiver"
+        )
+        self.assertEqual(code, 0)
+        assert verdict is not None
+        self.assertFalse(verdict["device_qualified"])
+
+    def test_a_receipt_that_records_a_failure_is_never_waived(self) -> None:
+        # The waiver stands in for evidence that does not exist. A device that ran
+        # these bytes and said no is evidence, and no footing outweighs it.
+        error = SCRIPT["QualificationError"](
+            "receipt.json records a failed qualification"
+        )
+        code, verdict, stderr = self.run_gate(error, "--allow-waiver")
+        self.assertEqual(code, 1)
+        self.assertIsNone(verdict)
+        self.assertIn("failed qualification", stderr.getvalue())
+
+    def test_a_receipt_for_other_bytes_is_never_waived(self) -> None:
+        error = SCRIPT["QualificationError"]("receipt does not cover every artifact")
+        code, verdict, _ = self.run_gate(error, "--allow-waiver")
+        self.assertEqual(code, 1)
+        self.assertIsNone(verdict)
 
 
 if __name__ == "__main__":
