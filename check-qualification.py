@@ -9,9 +9,10 @@ receipt committed under ``qualification/``, and confirms the second covers the
 artifacts the first just produced.
 
 ``--allow-waiver`` is for an unattended release. It does not weaken what a
-receipt means: when none covers these bytes, it asks instead whether anything
-but the pinned CPython input has changed since the last build a device did run,
-and permits the release only if nothing has. See ``pythonbuild/waiver.py``.
+receipt means: when none covers these bytes, the release is permitted anyway and
+the verdict records why it is not qualified — whether nothing but the pinned
+CPython input changed since the last build a device did run, something of this
+project's own did, or no device ever ran this build. See ``pythonbuild/waiver.py``.
 """
 
 from __future__ import annotations
@@ -40,8 +41,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--allow-waiver",
         action="store_true",
-        help="when no receipt covers these bytes, permit the release if nothing "
-        "but the pinned CPython input has changed since the last qualified tag",
+        help="when no receipt covers these bytes, permit the release anyway and "
+        "record what it stands on instead",
     )
     parser.add_argument(
         "--report",
@@ -113,47 +114,47 @@ def previous_released_qualified_tag(
 def consider_waiver(
     build: Build, tag: str, refusal: QualificationError, report: Path | None
 ) -> int:
-    """Permit an unattended release only when the change is upstream's alone."""
+    """Let a release with no receipt of its own go out, and record what it stands on.
+
+    Nothing here refuses: an unattended release that waited for a device would
+    not be unattended. What varies is the claim. Only a change that is upstream's
+    alone earns the waiver proper; anything else is published all the same, as a
+    prerelease whose notes say which footing it is on.
+    """
     previous = previous_released_qualified_tag(tag)
+    levels = shipped_api_levels(previous) if previous else {}
+    changed: list[str] = []
+    floor: int | None = None
+
     if previous is None:
-        print(
-            f"qualification gate: REFUSED\n\n{refusal}\n\n"
-            f"No earlier released qualified tag to compare against, so there is nothing a "
-            f"waiver could rest on.",
-            file=sys.stderr,
+        basis = waiver.NEVER_RUN
+        reason = "no earlier release was ever qualified on a device"
+    elif build.artifact_infix not in levels:
+        basis = waiver.NEVER_RUN
+        reason = (
+            f"{previous} has no passing receipt for {build.name}, so this build "
+            f"has never run on a device"
         )
-        return 1
-
-    levels = shipped_api_levels(previous)
-    if build.artifact_infix not in levels:
-        print(
-            f"qualification gate: REFUSED\n\n{refusal}\n\n"
-            f"{previous} has no passing receipt for {build.name}, so this build has "
-            f"never run on a device.",
-            file=sys.stderr,
+    else:
+        assessment = waiver.assess(
+            previous_tag=previous,
+            previous_api_level=levels[build.artifact_infix],
+            declared_api_level=build.android_api.level,
+            changed_paths=changed_since(previous),
         )
-        return 1
+        basis = assessment.basis
+        reason = assessment.reason()
+        changed = list(assessment.waived)
+        if assessment.granted:
+            floor = assessment.declared_api_level
 
-    assessment = waiver.assess(
-        previous_tag=previous,
-        previous_api_level=levels[build.artifact_infix],
-        declared_api_level=build.android_api.level,
-        changed_paths=changed_since(previous),
-    )
-    if not assessment.granted:
-        print(
-            f"qualification gate: REFUSED\n\n{refusal}\n\n"
-            f"A waiver was allowed but does not apply: {assessment.reason()}.\n"
-            f"Qualify this build on a device and commit the receipt.",
-            file=sys.stderr,
-        )
-        return 1
-
-    print(f"qualification gate: WAIVED for {build.name} at {tag}")
-    print("  no receipt covers these bytes; this release is not device-qualified")
-    print(f"  standing on  {assessment.reason()}")
-    print(f"  changed      {', '.join(assessment.waived) or 'nothing'}")
-    print(f"  floor        API {assessment.declared_api_level}, unchanged")
+    print(f"qualification gate: NOT QUALIFIED for {build.name} at {tag}")
+    print(f"  receipt   {str(refusal).splitlines()[0]}")
+    print("  this release is not device-qualified and goes out as a prerelease")
+    print(f"  basis     {basis}: {reason}")
+    if floor is not None:
+        print(f"  changed   {', '.join(changed) or 'nothing'}")
+        print(f"  floor     API {floor}, unchanged")
     _record(
         report,
         build,
@@ -161,9 +162,10 @@ def consider_waiver(
         qualified=False,
         detail={
             "waiver": {
-                "previous_tag": assessment.previous_tag,
-                "reason": assessment.reason(),
-                "changed": list(assessment.waived),
+                "basis": basis,
+                "previous_tag": previous,
+                "reason": reason,
+                "changed": changed,
             }
         },
     )

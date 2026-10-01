@@ -54,6 +54,87 @@ def render(previous_levels: dict[str, int] | None) -> str:
         return str(notes.render(RECEIPTS, "20260729", REPOSITORY, "20260728"))
 
 
+def verdict(basis: str | None, reason: str = "because") -> dict[str, Any]:
+    found: dict[str, Any] = {
+        "tag": "20260729",
+        "device_qualified": basis is None,
+    }
+    if basis is not None:
+        found["waiver"] = {"basis": basis, "previous_tag": "20260728", "reason": reason}
+    return found
+
+
+def render_unqualified(verdicts: list[dict[str, Any]] | None) -> str:
+    with mock.patch.object(notes, "shipped_api_levels", return_value={}):
+        return str(
+            notes.render(
+                RECEIPTS,
+                "20260729",
+                REPOSITORY,
+                "20260728",
+                device_qualified=False,
+                verdicts=verdicts,
+            )
+        )
+
+
+class UnqualifiedReleaseNotesTest(unittest.TestCase):
+    """A release nobody ran says so first, and claims only what its footing earns."""
+
+    def test_a_qualified_release_carries_no_caution(self) -> None:
+        self.assertNotIn("[!CAUTION]", render(None))
+
+    def test_the_caution_comes_before_everything_else(self) -> None:
+        text = render_unqualified([verdict("upstream-only")])
+        self.assertTrue(text.startswith("> [!CAUTION]"))
+
+    def test_an_upstream_only_change_may_lean_on_the_earlier_device_run(self) -> None:
+        text = render_unqualified([verdict("upstream-only")])
+        self.assertIn("nothing but the pinned CPython input changed", text)
+        self.assertIn("since `20260728`, which a device did run", text)
+
+    def test_a_change_to_this_project_may_not(self) -> None:
+        text = render_unqualified(
+            [
+                verdict(
+                    "changed", "this project's own files changed since 20260728: a.py"
+                )
+            ]
+        )
+        self.assertIn("this project's own files changed since 20260728: a.py", text)
+        self.assertIn("nothing here vouches that it works on one", text)
+        self.assertNotIn("the same code", text)
+
+    def test_a_build_no_device_ever_ran_says_so(self) -> None:
+        text = render_unqualified(
+            [verdict("never-run", "this build has never run on a device")]
+        )
+        self.assertIn("there is no earlier device run to lean on", text)
+        self.assertIn("this build has never run on a device", text)
+        self.assertNotIn("the same code", text)
+
+    def test_the_weakest_build_sets_the_claim_for_the_release(self) -> None:
+        text = render_unqualified(
+            [verdict("upstream-only"), verdict("changed", "files changed")]
+        )
+        self.assertIn("files changed", text)
+        self.assertNotIn("the same code", text)
+
+    def test_with_no_recorded_footing_it_claims_nothing(self) -> None:
+        for verdicts in (None, [], [verdict(None)]):
+            with self.subTest(verdicts=verdicts):
+                text = render_unqualified(verdicts)
+                self.assertIn("[!CAUTION]", text)
+                self.assertIn("Nothing here vouches that it works on a device", text)
+                self.assertNotIn("the same code", text)
+
+    def test_the_catalogs_are_said_to_be_left_alone_in_every_case(self) -> None:
+        for basis in ("upstream-only", "changed", "never-run"):
+            with self.subTest(basis=basis):
+                text = render_unqualified([verdict(basis)])
+                self.assertIn("`uv python install` is unaffected", text)
+
+
 class ReleaseNotesTest(unittest.TestCase):
     def test_unchanged_floors_produce_no_callout(self) -> None:
         text = render(
