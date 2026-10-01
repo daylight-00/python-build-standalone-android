@@ -65,6 +65,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # An API error has to stop this step. Without -e and pipefail, a failed
+          # `gh` reads as "nothing published" and dispatches a release over one.
+          set -euo pipefail
+
           # Every version a build pins, one per line. Read from the locks rather
           # than from a release, because the pin is what a release has to follow.
           versions=$(uv run python -c "
@@ -98,11 +102,23 @@ jobs:
             needed=false
           fi
 
-          # One release a day, as the tag is a date. A tag already taken, draft
-          # included, means today was spent; tomorrow's run tries again.
+          # One dispatch a day, whatever came of it. The tag is a date, and a
+          # release that failed after creating its draft leaves a tag this token
+          # cannot see, so trying again the same day could publish a second
+          # release under it. Tomorrow's run tries again.
+          today=$(date -u +%Y-%m-%d)
+          dispatched=$(gh run list --workflow release.yml --created ">=$today" \
+            --json databaseId --jq length)
+          if [ "$dispatched" -gt 0 ]; then
+            echo "a release was already dispatched today"
+            needed=false
+          fi
+
+          # Assigned first, so that a failing `gh` stops the step instead of
+          # reading as a tag nobody has taken.
           tag=$(date -u +%Y%m%d)
-          if gh release list --limit 200 --json tagName --jq '.[].tagName' \
-            | grep -qx "$tag"; then
+          taken=$(gh release list --limit 200 --json tagName --jq '.[].tagName')
+          if grep -qx "$tag" <<< "$taken"; then
             echo "$tag is already taken"
             needed=false
           fi
