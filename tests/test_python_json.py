@@ -12,7 +12,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
+from unittest import mock
 
+from pythonbuild import python_json
 from pythonbuild.conformance import check_python_json
 from pythonbuild.python_json import RUN_TESTS, RUN_TESTS_SOURCE, build_python_json
 from pythonbuild.runtime_metadata import Layout
@@ -95,6 +97,33 @@ class PythonJsonSchemaTest(unittest.TestCase):
         token = MAGIC | (ord("\r") << 16) | (ord("\n") << 24)
         expected = token.to_bytes(4, "little").hex()
         self.assertEqual(self.build()["python_bytecode_magic_number"], expected)
+
+    def test_an_extension_is_the_default_variant_of_itself(self) -> None:
+        # Upstream names the variant "default" and says nothing about loading, which
+        # `python_extension_module_loading` already does. "shared-library" here
+        # conformed to the schema and so went unnoticed.
+        layout = Layout(PYTHON_MM, "aarch64-linux-android")
+        with TemporaryDirectory() as tmp:
+            install = make_prefix(Path(tmp))
+            dynload = install / layout.stdlib / "lib-dynload"
+            dynload.mkdir()
+            (dynload / "_ssl.cpython-314-aarch64-linux-android.so").write_bytes(b"")
+            with (
+                mock.patch.object(python_json, "is_elf", return_value=True),
+                mock.patch.object(
+                    python_json, "elf_surface", return_value={"needed": []}
+                ),
+                mock.patch.object(python_json, "_provider_map", return_value={}),
+            ):
+                document = build_python_json(
+                    install,
+                    make_build(),
+                    python_version="3.14.6",
+                    python_mm=PYTHON_MM,
+                    config_vars_source={"abiflags": ""},
+                )
+        (extension,) = document["build_info"]["extensions"]["_ssl"]
+        self.assertEqual(extension["variant"], "default")
 
 
 if __name__ == "__main__":
