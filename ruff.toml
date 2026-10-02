@@ -1,8 +1,9 @@
-# Both match upstream: it sets neither, so both are ruff's defaults there, and a
-# file formatted at 100 columns would be rewritten the moment it met upstream's
-# formatter. The lint selection below is a superset of upstream's ["F", "I", "B"];
+# The line length is upstream's: it sets none, so it is ruff's default there, and
+# a file formatted at 100 columns would be rewritten the moment it met upstream's
+# formatter. The target is the floor `requires-python` declares, which is upstream's
+# too. The lint selection below is a superset of upstream's ["F", "I", "B"];
 # a stricter selection costs nothing on the way in.
-target-version = "py310"
+target-version = "py311"
 line-length = 88
 # Named rather than inherited from .gitignore: what gets linted should not
 # change because an ignore rule did.
