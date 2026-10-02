@@ -195,6 +195,19 @@ class UnqualifiedReleaseNotesTest(unittest.TestCase):
                 text = render_unqualified([verdict(basis)])
                 self.assertIn("**`uv python install`** — unaffected", text)
 
+    def test_the_edge_channel_is_offered_in_every_case(self) -> None:
+        for basis in ("upstream-only", "changed", "never-run"):
+            with self.subTest(basis=basis):
+                text = render_unqualified([verdict(basis)])
+                self.assertIn("follow the `edge` branch", text)
+
+    def test_the_notes_never_call_it_a_prerelease(self) -> None:
+        # GitHub's flag has that name; what the release is has another: it is not
+        # device-qualified. "Prerelease" also means something else to uv.
+        text = render_unqualified([verdict("changed")])
+        self.assertNotIn("prerelease", text.lower())
+        self.assertIn("**Not device-qualified.**", text)
+
 
 class VerdictLoadingTest(unittest.TestCase):
     """``main`` finds the gate's verdicts next to the artifacts, whatever they are called."""

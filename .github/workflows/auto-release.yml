@@ -4,10 +4,10 @@ name: auto-release
 #
 # A pin bump lands on main, nothing carries the version it pinned, and this
 # dispatches the release workflow for it: unattended, with the device gate
-# waived. What that publishes is a prerelease whose notes say what it stands on,
-# and the uv catalogs are left alone, so nothing here can make `uv python
-# install` resolve to bytes a device did not run. Promoting a release is still a
-# person with a device.
+# waived. What that publishes is not device-qualified, its notes say what it
+# stands on, and it reaches only the edge channel. The uv catalogs are left
+# alone, so nothing here can make `uv python install` resolve to bytes a device
+# did not run. Promoting a release is still a person with a device.
 #
 # Two brakes, both off by default for a release, which cannot be taken back:
 #

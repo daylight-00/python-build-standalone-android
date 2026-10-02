@@ -6,8 +6,8 @@ name: update-pins
 # release waiver was written for. The build workflow builds and validates the
 # pull request, and the api-level workflow re-measures the floor because
 # `config/**` changed. Once it is merged, auto-release.yml can release it if it
-# has been turned on, and a device is needed only to take the result out of
-# prerelease.
+# has been turned on, and a device is needed only to make the result
+# device-qualified.
 #
 # It opens a pull request rather than committing to main. The point of the
 # automation is to notice, not to decide.

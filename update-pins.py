@@ -11,7 +11,7 @@ than tracked here — see ``pythonbuild/upstream.py``.
 
 A patch bump changes the pinned bytes and nothing else, which is exactly the case
 the release waiver was built for: CI can build and validate it unattended, and a
-device is needed only to promote the result out of prerelease.
+device is needed only to make the result device-qualified.
 
 The API floor is not touched. It is measured, by ``resolve-api-level.py``, and
 the workflow that measures it triggers on the files this script writes.
@@ -213,8 +213,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  lock       {option}: {path.relative_to(ROOT).as_posix()}")
     print(
         "\n  The API floor is not touched here — it is measured. Let the api-level\n"
-        "  workflow re-measure it, and qualify the build on a device before the\n"
-        "  release leaves prerelease."
+        "  workflow re-measure it, and qualify the build on a device before it\n"
+        "  can become what uv installs."
     )
     return 0
 

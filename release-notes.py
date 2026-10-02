@@ -179,9 +179,10 @@ def _unqualified_callout(
         [
             "> - **Checked by CI** — every archive is byte-reproducible and holds "
             "to the distribution contract.",
-            "> - **`uv python install`** — unaffected: the catalogs still resolve to "
-            "the last qualified release. Use this release's own catalog, below, to "
-            "take it.",
+            "> - **`uv python install`** — unaffected: `latest-release` still resolves "
+            "to the last device-qualified release. To take this one, use its own "
+            "catalog below, or follow the `edge` branch, the newest release of any "
+            "kind.",
             "",
         ]
     )

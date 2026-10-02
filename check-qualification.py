@@ -135,7 +135,7 @@ def consider_waiver(
     Nothing here refuses for want of a receipt: an unattended release that waited
     for a device would not be unattended. What varies is the claim. Only a change
     that is upstream's alone earns the waiver proper; anything else is published
-    all the same, as a prerelease whose notes say which footing it is on.
+    all the same, on the edge channel, with notes that say which footing it is on.
 
     It is reached only when no receipt exists. A receipt that does exist and
     disagrees with these bytes is a refusal that no footing stands in for.
@@ -177,7 +177,7 @@ def consider_waiver(
 
     print(f"qualification gate: NOT QUALIFIED for {build.name} at {tag}")
     print(f"  receipt   {str(absent).splitlines()[0]}")
-    print("  this release is not device-qualified and goes out as a prerelease")
+    print("  this release is not device-qualified and reaches only the edge channel")
     print(f"  basis     {basis}: {reason}")
     if floor is not None:
         print(f"  changed   {', '.join(waived) or 'nothing'}")
