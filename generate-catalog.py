@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """Generate the uv download-metadata catalog for a built target.
 
     ./generate-catalog.py --target aarch64-linux-android:upstream --tag 20260727

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """Measure the minimum Android API level the flagship build should target.
 
     ./resolve-api-level.py                 # report what the rule selects
