@@ -1,72 +1,56 @@
-# Device qualification receipts
+# Device Qualification Receipts
 
-CI cannot run these distributions — GitHub has no Android runner. The check that
-matters most therefore happens on a device, out of band, and its result is
-committed here.
+CI has no Android runner, so the check that matters most happens on a device and its result is committed here.
 
 ```
 qualification/<tag>/cpython-<version>-<triple>[-<build option>].json
 ```
 
-The release workflow refuses to publish a build unless a receipt here covers
-every artifact in the release by SHA-256. A receipt is evidence only for the
-bytes it names.
+- **Gate** — the release workflow refuses to publish a build unless a receipt here covers every artifact in the release by SHA-256, or the release is made [without one](../docs/technotes.md#releasing-without-one) and says so.
+- **Binding** — a receipt is evidence only for the bytes it names.
+- **Lookup** — the gate finds a receipt by the artifact it records having run against, not by filename, so a receipt cannot claim a build by being named after one. The name mirrors the artifact stem, minus the tag the directory carries.
+- **Unreleased candidates** — a tag here may hold receipts for bytes that were never released. They stay valid for whatever tag those bytes are published under; the tag is not inside the archive.
 
-The name mirrors the artifact stem without the tag, which the directory already
-carries, so a listing says which Python each receipt qualified. Nothing depends
-on it, though: the gate finds a receipt by the artifact it records having run
-against, not by its filename, so a receipt cannot claim a build by being named
-after one.
+## Producing One
 
-A tag here may hold receipts for a candidate that was never released. The
-receipts bind bytes, not names, so they stay valid for whatever tag those bytes
-are eventually published under — the release tag does not reach inside an
-archive.
-
-## Producing one
-
-Build the release candidate, then copy `qualify.py` and the archives to the
-device:
+1. Build the release candidate for each build option.
+2. Copy `qualify.py` and the archives to the device. It needs only the standard library.
+3. Run it once per build, in Termux. The archive named first is the one executed; use the flavor the uv catalog points at. The rest are bound by hash.
 
 ```console
-$ ./build.py --target aarch64-linux-android --tag 20260730
-$ ./build.py --target aarch64-linux-android:upstream --tag 20260730
+$ ./build.py --target aarch64-linux-android --tag <tag>
+$ ./build.py --target aarch64-linux-android:upstream --tag <tag>
 ```
-
-On the device, in Termux — one run per build. The flagship compiles its trust
-store in, so it is asked to resolve it with nothing set; the baseline gets its
-certificates from the data track and is not:
 
 ```console
 $ python3 qualify.py \
-    cpython-3.14.6+20260730-aarch64-linux-android-install_only_stripped.tar.gz \
+    cpython-<version>+<tag>-aarch64-linux-android-install_only_stripped.tar.gz \
     --also-binds \
-        cpython-3.14.6+20260730-aarch64-linux-android-full.tar.zst \
-        cpython-3.14.6+20260730-aarch64-linux-android-install_only.tar.gz \
+        cpython-<version>+<tag>-aarch64-linux-android-full.tar.zst \
+        cpython-<version>+<tag>-aarch64-linux-android-install_only.tar.gz \
     --expected-api 34 --builtin-runtime-data \
-    -o cpython-3.14.6-aarch64-linux-android.json
+    -o cpython-<version>-aarch64-linux-android.json
 
 $ python3 qualify.py \
-    cpython-3.14.6+20260730-aarch64-linux-android-upstream-install_only_stripped.tar.gz \
+    cpython-<version>+<tag>-aarch64-linux-android-upstream-install_only_stripped.tar.gz \
     --also-binds \
-        cpython-3.14.6+20260730-aarch64-linux-android-upstream-full.tar.zst \
-        cpython-3.14.6+20260730-aarch64-linux-android-upstream-install_only.tar.gz \
+        cpython-<version>+<tag>-aarch64-linux-android-upstream-full.tar.zst \
+        cpython-<version>+<tag>-aarch64-linux-android-upstream-install_only.tar.gz \
     --expected-api 24 \
-    -o cpython-3.14.6-aarch64-linux-android-upstream.json
+    -o cpython-<version>-aarch64-linux-android-upstream.json
 ```
 
-`qualify.py` needs only the standard library. The archive named first is the one
-actually executed — use the flavor the uv catalog points at. The others are
-bound by hash so the gate can confirm the whole release was covered.
+- **Flagship** — compiles its trust store in, so `--builtin-runtime-data` asks it to resolve one with nothing set.
+- **Baseline** — gets its certificates from the data track, so it is not asked.
 
 Commit the receipts under the release tag, then check them from the repository:
 
 ```console
-$ ./check-qualification.py --target aarch64-linux-android --tag 20260730
-$ ./check-qualification.py --target aarch64-linux-android:upstream --tag 20260730
+$ ./check-qualification.py --target aarch64-linux-android --tag <tag>
+$ ./check-qualification.py --target aarch64-linux-android:upstream --tag <tag>
 ```
 
-## What it checks
+## What It Checks
 
 | Check | What a failure would mean |
 | --- | --- |
@@ -79,12 +63,5 @@ $ ./check-qualification.py --target aarch64-linux-android:upstream --tag 2026073
 | `venv` | virtual environments cannot be created from the prefix |
 | runtime data | a trust store or time zone path the build compiled in does not resolve |
 
-The runtime data check asks for exactly what `ci-targets.yaml` says the build
-compiled in, and nothing more: a build that declares an `openssldir` has to
-resolve certificates there, and one that declares no time zone path is not asked
-for zones. Without it the gate passed a build whose `zoneinfo` did not work.
-
-No `LD_LIBRARY_PATH` is set for any of it, so the relative `RUNPATH` has to do
-the work on its own. The interpreter is given a caller-owned writable state root
-and nothing else inherited from the shell, so a bug cannot hide behind the
-device's environment.
+- **Runtime data** — held to exactly what `ci-targets.yaml` says the build compiled in: a declared `openssldir` must resolve certificates, and a build with no time zone path is not asked for zones.
+- **Environment** — no `LD_LIBRARY_PATH`, so the relative `RUNPATH` does the work alone. The interpreter gets a caller-owned writable state root and nothing else from the shell, so a bug cannot hide behind the device's environment.

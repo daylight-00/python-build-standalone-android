@@ -1,7 +1,7 @@
 """Shared fixtures.
 
 Builds are constructed here rather than read from ``ci-targets.yaml`` wherever a
-test is about behaviour rather than about the table, so editing the table cannot
+test is about behavior rather than about the table, so editing the table cannot
 quietly change what a test asserts.
 """
 

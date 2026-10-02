@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """Build the archive family for one Android build.
 
     ./build.py --target aarch64-linux-android:upstream --tag 20260727

@@ -35,8 +35,8 @@ android:
           level: 34
           policy: last-api-affecting-cpython-configure
           rationale: >-
-            The highest API level whose Bionic additions appear in CPython's
-            AC_CHECK_FUNCS list. Above it the build makes identical decisions,
+            The highest API level whose Bionic additions change what CPython's
+            configure decides. Above it the build makes identical decisions,
             so raising it would only cost device coverage.
 
         # OpenSSL's trust store is compiled in, because its default of

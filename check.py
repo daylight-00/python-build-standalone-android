@@ -1,4 +1,7 @@
 #!/usr/bin/env -S uv run --group check
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 """Run every static check this repository has, or fix what can be fixed.
 
     ./check.py         # lint, formatting, and types

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """Hold a finished archive to the distribution contract.
 
     ./validate-distribution.py dist/cpython-3.14.6+20260729-*-full.tar.zst
@@ -8,7 +8,7 @@ Every other guard in this repository runs while a distribution is being built,
 which means a published archive cannot be re-examined without rebuilding it.
 This takes the bytes and asks the questions again: does PYTHON.json satisfy the
 schema upstream's own reader enforces, are the extension modules the ones
-CPython says it built, are the licence texts there, and does anything name a
+CPython says it built, are the license texts there, and does anything name a
 path it should not.
 
 Upstream validates its distributions the same way, from the archive rather than
@@ -88,16 +88,16 @@ def check_metadata(root: Path, flavor: str) -> list[str]:
 def check_licenses(prefix: Path) -> list[str]:
     manifest = prefix / LICENSE_MANIFEST
     if not manifest.is_file():
-        return [f"no licence manifest at {LICENSE_MANIFEST}"]
+        return [f"no license manifest at {LICENSE_MANIFEST}"]
     components = json.loads(manifest.read_text(encoding="utf-8"))["components"]
     declared = {c["file"] for c in components if c.get("file")}
     shipped = {p.name for p in (prefix / "licenses").glob("LICENSE.*.txt")}
     problems = [
-        f"licence text declared but not shipped: {name}"
+        f"license text declared but not shipped: {name}"
         for name in sorted(declared - shipped)
     ]
     problems += [
-        f"licence text shipped but not declared: {name}"
+        f"license text shipped but not declared: {name}"
         for name in sorted(shipped - declared)
     ]
     return problems
@@ -140,7 +140,7 @@ def validate(archive: Path) -> list[str]:
                 f"  not built              {', '.join(sorted(expected.unavailable)) or 'none'}"
             )
             print(
-                f"  licence texts          {len(list((prefix / 'licenses').glob('LICENSE.*.txt')))}"
+                f"  license texts          {len(list((prefix / 'licenses').glob('LICENSE.*.txt')))}"
             )
             if flavor == "full":
                 print("  PYTHON.json            conforms to upstream's format 8 schema")

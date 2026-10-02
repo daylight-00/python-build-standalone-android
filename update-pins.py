@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """Follow python.org's newest patch release of the pinned CPython series.
 
     ./update-pins.py            # report what is pinned and what is available

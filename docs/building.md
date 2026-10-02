@@ -1,20 +1,13 @@
 # Building
 
-Building a distribution yourself. Everything here runs on `linux-x86_64`; see
-[Toolchain](technotes.md#toolchain) for why that is the only release host.
+Build a distribution yourself. Everything here runs on `linux-x86_64`, the only release host; see [Toolchain](technotes.md#toolchain).
 
-## What you need
+## What You Need
 
-- [uv](https://docs.astral.sh/uv/), which manages the Python and the pinned
-  dependencies. Nothing else is installed globally.
-- An Android NDK at the pinned revision. `config/toolchain.lock.json` states
-  which, and the build prints the `sdkmanager` line to install it if it cannot
-  find one.
-- Roughly 4 GB of disk for a source build, and an hour or two of CPU.
-
-The `upstream` build needs neither the NDK's compiler nor that much time — it
-repackages an archive rather than compiling one — but it does use the NDK's
-`readelf`, `strip`, and the pinned `patchelf`.
+- **[uv](https://docs.astral.sh/uv/)** — manages the Python and the pinned dependencies; nothing else is installed globally.
+- **Android NDK** — at the revision `config/toolchain.lock.json` pins; the build prints the `sdkmanager` line to install it if it cannot find one.
+- **Resources** — roughly 4 GB of disk and an hour or two of CPU for a source build.
+- **`upstream`** — repackages an archive, so it needs neither the NDK's compiler nor that much time; it still uses the NDK's `readelf`, `strip`, and the pinned `patchelf`.
 
 ## Building
 
@@ -23,55 +16,36 @@ $ ./build.py --target aarch64-linux-android --tag $(date -u +%Y%m%d)
 $ ./build.py --target aarch64-linux-android:upstream --tag $(date -u +%Y%m%d)
 ```
 
-A build is named `triple` or `triple:build-option`; naming the triple alone
-selects the flagship. `ci-targets.yaml` is the list of what exists, and
-`./ci-matrix.py` prints it.
+- **Name** — `triple` or `triple:build-option`; the triple alone selects the flagship. `ci-targets.yaml` lists what exists, and `./ci-matrix.py` prints it.
+- **Output** — three archives and a build receipt in `dist/`.
+- **Receipt** — records the inputs, the toolchain, every mutation, and each archive's SHA-256; `check-qualification.py`, `generate-catalog.py`, and `release-notes.py` read it.
+- **Intermediates** — in `build/`, emptied before each build so a result cannot depend on what was built before; the clone and download caches persist.
 
-Three archives and a build receipt land in `dist/`. The receipt records the
-inputs, the toolchain, every mutation, and the SHA-256 of each archive; it is
-what `check-qualification.py`, `generate-catalog.py`, and `release-notes.py`
-read.
+Upstream's `build.py` takes `--target-triple`, `--options` and `--python`. Here:
 
-Intermediates live in `build/`. The tree for a given build is emptied before it
-is written into — a prefix left over from an earlier run would make the result
-depend on what was built before — but the clone and download caches persist.
+- **`--target`** — carries the build option, as `triple:build-option`, because `ci-targets.yaml` enumerates builds that way.
+- **No `--python`** — the version is not an input; it comes from the input lock, which names it in its path and again in its contents.
 
-## Checking what you built
+## Checking What You Built
 
 ```console
 $ ./validate-distribution.py dist/*.tar.zst dist/*.tar.gz
+$ just build-reproducible aarch64-linux-android <tag>
 ```
 
-This holds a finished archive to the distribution contract: the `PYTHON.json`
-schema upstream's own reader enforces, the extension modules CPython says it
-built, the licence texts, and the member paths. CI runs it on every build, and
-it works just as well on an archive downloaded from a release.
+- **Contract** — `validate-distribution.py` holds a finished archive to the `PYTHON.json` schema upstream's own reader enforces, the extension modules CPython says it built, the license texts against the manifest, and the member paths.
+- **Where it runs** — CI runs it on every build; it works on a downloaded release archive too.
+- **Reproducibility** — a property of the build, so proving it takes two; `build-reproducible` builds twice and compares.
+- **Umask** — CI also runs the second build under a different umask; see [Reproducibility](distributions.md#reproducibility).
 
-Reproducibility is a property of the build, so proving it takes two:
-
-```console
-$ just build-reproducible aarch64-linux-android 20260729
-```
-
-CI additionally runs the second build under a different umask, because repeating
-a build under identical conditions proves much less than it appears to.
-
-## Qualifying on a device
+## Qualifying on a Device
 
 CI has no Android runner, so the check that matters most happens out of band.
-Copy `qualify.py` and an archive to a device and run them there with any
-Python 3:
 
-```console
-$ python3 qualify.py cpython-3.14.6+20260729-…-install_only_stripped.tar.gz \
-    --expected-api 34 -o aarch64-linux-android.json
-```
-
-The receipt it writes binds its findings to the exact archive bytes. Commit it
-under `qualification/<tag>/cpython-<version>-<build>.json`; the release workflow
-refuses to
-publish unless one covers every artifact by SHA-256. `check-qualification.py`
-answers whether a committed receipt covers what you just built.
+- **Procedure** — copy `qualify.py` and the archives to a device and run it there with any Python 3; the exact commands for each build are in [`qualification/README.md`](../qualification/README.md).
+- **Receipt** — binds its findings to the exact archive bytes; commit it under `qualification/<tag>/`.
+- **Gate** — the release workflow refuses to publish unless a receipt covers every artifact by SHA-256, or the release is made [without one](technotes.md#releasing-without-one).
+- **Coverage** — `check-qualification.py` answers whether a committed receipt covers what you just built.
 
 ## Checks
 
@@ -80,39 +54,32 @@ $ ./check.py          # lint, formatting, types, tests
 $ ./check.py --fix    # apply what ruff can apply
 ```
 
-`ruff.toml` and `mypy.ini` decide what is checked, so no command line has to be
-kept in step with them.
+- **Configuration** — `ruff.toml` and `mypy.ini` decide what is checked, so no command line has to be kept in step with them.
 
-## Following a new CPython patch
+## Following a New CPython Patch
 
 ```console
 $ ./update-pins.py            # report
 $ ./update-pins.py --write    # move both builds to the newest patch
 ```
 
-One version directory on python.org serves both builds, and the dependency set is
-re-read from the new source rather than carried over. See
-[following upstream](technotes.md#following-upstream). A weekly workflow does
-this and opens a pull request.
+- **Inputs** — one python.org version directory serves both builds, and the dependency set is re-read from the new source, not carried over; see [Following Upstream](technotes.md#following-upstream).
+- **Automation** — a weekly workflow does this and opens a pull request.
 
-## The flagship's API floor
+## The Flagship's API Floor
 
-`ci-targets.yaml` declares it, and the rule it declares is measured rather than
-argued:
+`ci-targets.yaml` declares it, and the rule it declares is measured rather than argued:
 
 ```console
 $ ./resolve-api-level.py            # report what the rule selects
 $ ./resolve-api-level.py --check    # fail if the declaration has gone stale
 ```
 
-It configures CPython at candidate levels and compares the generated
-`pyconfig.h`, so it needs the NDK and a build interpreter and takes tens of
-minutes. It is not part of a build — see
-[the API policy](technotes.md#the-android-api-policy) — and CI runs it when the
-CPython or NDK pin changes, and weekly.
+- **Method** — configures CPython at candidate levels and compares the generated `pyconfig.h`; needs the NDK and a build interpreter, and takes tens of minutes.
+- **Not part of a build** — see [the API policy](technotes.md#the-android-api-policy).
+- **CI** — runs it when the CPython or NDK pin changes, and weekly.
 
 ## Releasing
 
-Releases are manual and gated: `workflow_dispatch` with an explicit tag and
-commit, a protected environment, and `dry-run` defaulting to true. See
-[Release model](technotes.md#release-model).
+- **Manual and gated** — `workflow_dispatch` with an explicit tag and commit, the `release` environment, and `dry-run` defaulting to true; see [Release Model](technotes.md#release-model).
+- **Exception** — [releasing unattended](technotes.md#releasing-unattended), off until opted into.

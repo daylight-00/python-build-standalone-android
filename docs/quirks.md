@@ -1,30 +1,22 @@
 # Android Quirks
 
-Where Bionic and Android differ from the POSIX host CPython expects, and what
-this project does about each. These are runtime properties: they describe the
-distribution you unpack, not the machine that built it.
+Where Bionic and Android differ from the POSIX host CPython expects, and what each build does about it. These are runtime properties of the distribution you unpack, not of the machine that built it.
 
-## Runtime data: CA certificates and time zones
+## Runtime Data: CA Certificates and Time Zones
 
 Bionic provides neither of the two things a POSIX CPython assumes:
 
-- no `/etc/ssl/certs`, so `ssl.create_default_context()` has an empty trust
-  store and every HTTPS call fails, including `pip` and `uv`;
-- no `/usr/share/zoneinfo`, so `zoneinfo.ZoneInfo("Asia/Seoul")` fails. Android's
-  own tz database uses a private merged format CPython cannot read.
+- **No `/etc/ssl/certs`** — `ssl.create_default_context()` has an empty trust store and every HTTPS call fails, including `pip` and `uv`.
+- **No `/usr/share/zoneinfo`** — `zoneinfo.ZoneInfo("Asia/Seoul")` fails; Android's own tz database uses a private merged format CPython cannot read.
 
-### `upstream` — external data product
+### `upstream` — External Data Product
 
-The official package is consumed as-is, so no compiled-in default can be
-changed. CA and time zone payloads ship as a **separate release track**:
-`certifi` plus a raw `zoneinfo` tree, installed into an external `DATA_ROOT`
-with an atomic `current` symlink and rollback.
+- **External** — the official package is consumed as-is, so no compiled-in default can be changed.
+- **Data track** — `certifi` plus a raw `zoneinfo` tree ship on a separate release track, installed into an external `DATA_ROOT` with an atomic `current` symlink and rollback.
+- **Separate** — `certifi` and `tzdata` expire on their own schedule; a small data refresh must not require republishing a whole Python archive.
+- **Use** — point `SSL_CERT_FILE` and `PYTHONTZPATH` at the installed data; see [Running Distributions](running.md#ca-certificates-and-time-zones).
 
-Separating the track is deliberate: `certifi` and `tzdata` expire on their own
-schedule, and a 227 KiB data refresh must not require republishing a 24 MiB
-Python archive.
-
-### `default` — a compiled-in trust store
+### `default` — A Compiled-In Trust Store
 
 Only the CA half is solved at build time:
 
@@ -32,34 +24,14 @@ Only the CA half is solved at build time:
 OpenSSL   --openssldir=/data/data/com.termux/files/usr/etc/tls
 ```
 
-`--openssldir` is fixed when OpenSSL is compiled, and upstream's
-`Android/android.py` downloads prebuilt dependency archives built with OpenSSL's
-default:
-
-```
-/usr/local/ssl/cert.pem
-/usr/local/ssl/certs
-```
-
-Neither path exists on Android, which is the root cause of the empty trust
-store, and no amount of repackaging can change it afterwards. So `default`
-builds all six dependency recipes from source rather than unpacking them — that
-one argument is the whole reason. It stays overridable at runtime with
-`SSL_CERT_FILE` and `SSL_CERT_DIR`, and it makes the runtime require no Termux
-prefix and no Termux native library, which is why it is not named in the
-artifact.
-
-**The time zone path is left at CPython's default**, as upstream leaves it.
-Termux ships no zoneinfo tree, so compiling in a path to one would name a
-directory that does not exist. `zoneinfo` therefore falls back to the `tzdata`
-package, exactly as it does on a Linux host with no system zoneinfo installed.
-Callers who need time zones install `tzdata`, set `PYTHONTZPATH`, or use the
-data product.
-
-An earlier version of this document claimed the source build solved both halves.
-It did not: a device found `ZoneInfo("Asia/Seoul")` failing while the
-qualification gate passed, because nothing checked it. The gate checks it now,
-and only against what a build actually declares.
+- **Why compiled in** — `--openssldir` is fixed when OpenSSL is built, and no repackaging can change it afterward.
+- **Upstream's default** — `Android/android.py` downloads prebuilt dependency archives built with `/usr/local/ssl/cert.pem` and `/usr/local/ssl/certs`; neither exists on Android, which is the root cause of the empty trust store.
+- **Cost** — `default` builds all six dependency recipes from source rather than unpacking them; the `--openssldir` argument is the whole reason.
+- **Overridable** — `SSL_CERT_FILE` and `SSL_CERT_DIR` still apply at runtime.
+- **No Termux dependency** — the runtime requires no Termux prefix and no Termux native library, which is why it is not named in the artifact.
+- **Time zone path** — left at CPython's default, as upstream leaves it; Termux ships no zoneinfo tree, so compiling in a path would name a directory that does not exist.
+- **Time zone fallback** — `zoneinfo` falls back to the `tzdata` package, as on a Linux host with no system zoneinfo. Callers who need time zones install `tzdata`, set `PYTHONTZPATH`, or use the data product.
+- **Gate** — the qualification gate checks time zone resolution only against what a build declares.
 
 What the two builds resolve on a device, with nothing set:
 
@@ -69,37 +41,21 @@ What the two builds resolve on a device, with nothing set:
 | CA certificates loaded | **119** | **0** |
 | Time zone directories present | none | none |
 
-Both figures come from the committed qualification receipts. The trust store is
-the whole difference the source build buys, and 119 against 0 is the size of it.
+- **Source** — the committed qualification receipts under `qualification/`.
+- **Speed** — the source build's other advantage, measured in [the technical notes](technotes.md#why-a-source-build-is-worth-having).
+- **System databases** — Android's own CA and tz databases are not used by either build; adopting them is still under research.
 
-Using Android's own system CA and tz databases belongs to `extended` or beyond,
-and is still under research.
+## Android Adaptations
 
-## Android adaptations
-
-The official Android package is embedding-oriented and ships no interpreter
-executable, so the project supplies one: the POSIX-equivalent
-`Programs/python.c` `Py_BytesMain` frontend, with no loader bootstrap, no CA
-policy, and no custom argument handling.
-
-Every ELF object receives one relative `DT_RUNPATH` from its own directory to
-the install `lib` directory, preserving `DT_NEEDED`, SONAME, architecture, ELF
-kind, and the 16 KiB program-segment alignment contract. A project-required
-`LD_LIBRARY_PATH` and bootstrap self-re-execution are both forbidden.
-
-`bin/pip*` and `bin/python3.14-config` are shell wrappers that locate their
-sibling interpreter relatively, because a generated console script bakes in the
-absolute interpreter path it was created with and the prefix must stay
-relocatable.
-
-Writable state follows a three-root model:
+- **Interpreter** — the official package is embedding-oriented and ships no executable, so the project supplies the POSIX-equivalent `Programs/python.c` `Py_BytesMain` frontend: no loader bootstrap, no CA policy, no custom argument handling.
+- **`DT_RUNPATH`** — every ELF object gets one relative entry, from its own directory to the install `lib` directory.
+- **Preserved** — `DT_NEEDED`, SONAME, architecture, ELF kind, and the 16 KiB program-segment alignment contract.
+- **Forbidden** — a project-required `LD_LIBRARY_PATH`, and bootstrap self-re-execution.
+- **Shell wrappers** — `bin/pip*` and `bin/python3.14-config` locate their sibling interpreter relatively, because a generated console script bakes in the absolute interpreter path and the prefix must stay relocatable.
+- **Writable state** — a three-root model:
 
 ```
 INSTALL_ROOT   immutable, relocatable
 DATA_ROOT      independently updateable CA and time zone payloads
 STATE_ROOT     caller-owned cache, temp, user-site, and venv state
 ```
-
-
-[pbs]: https://github.com/astral-sh/python-build-standalone
-[research]: https://github.com/daylight-00/cpython-android-cli
