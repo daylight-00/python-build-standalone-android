@@ -12,7 +12,7 @@ residual risk is upstream's. That is the strongest claim available without a
 device, and it is the only one that is a *waiver*: ``UPSTREAM_ONLY``.
 
 If anything else differs, the risk is this project's own and nothing can be said
-about it, but the release is still published as a prerelease that says so:
+about it, but the release is still published, on the edge channel, saying so:
 ``CHANGED``. And a build no device has ever run has no earlier build to stand on
 at all: ``NEVER_RUN``. The three are recorded, and the release notes say which.
 

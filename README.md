@@ -7,7 +7,7 @@ Standalone, redistributable CPython for Android (Bionic), published in the shape
 - **Upstream-compatible** — same archive roots, flavors, `PYTHON.json` metadata, artifact naming, and release model; existing consumers work unchanged.
 - **Portable** — a prefix relocates to any path.
 - **Reproducible** — archives are byte-identical across hosts.
-- **Gated** — each release rests on a device qualification receipt, or is a prerelease that says it has none.
+- **Gated** — a release is device-qualified by a receipt, or says it is not and stays off the default catalog. An opt-in `edge` channel follows the newest of either; see [Channels](docs/running.md#channels).
 - **Two builds** — a flagship compiled from source, and an `upstream` baseline for wider device coverage.
 
 ## Getting Started

@@ -140,7 +140,7 @@ $ ./update-pins.py --write    # move the pins to the newest patch of the series
 
 - **Weekly workflow** — runs it and opens a pull request when the series has moved. It opens a request rather than committing, because the automation exists to notice, not to decide.
 - **On the pull request** — the build workflow builds and validates it; the api-level workflow re-measures the floor because `config/**` changed.
-- **After merge** — [Releasing Unattended](#releasing-unattended) carries on if turned on. Only taking the release out of prerelease needs a device.
+- **After merge** — [Releasing Unattended](#releasing-unattended) carries on if turned on. Only making the release device-qualified needs a device.
 - **Patch bumps** — exactly the case [the waiver](#releasing-without-one) covers: the pinned bytes move and nothing this project owns does.
 - **New series** — a separate decision, not followed. `upstream` cannot exist before 3.14, because python.org publishes no Android package for earlier series, and every added series costs a device qualification per release.
 
@@ -152,7 +152,12 @@ $ ./update-pins.py --write    # move the pins to the newest patch of the series
 - **Tags are immutable** — a published tag's assets are never replaced, because the uv catalog pins them by hash.
 - **Contents** — `SHA256SUMS`, per-component license texts inside each archive, build provenance attestations, generated release notes, and a `download-metadata.json` catalog per build option.
 - **Draft first** — the release is created as a draft and published once every asset is uploaded, so a catalog never points at an empty release.
-- **`latest-release`** — for a qualified release, this branch publishes the catalogs and a `latest-release.json` pointer at stable raw URLs.
+- **Channels** — two branches publish the catalogs and a `latest-release.json` pointer at stable raw URLs, under the same file names so tooling reads either:
+  - **`latest-release`** — moves only for a device-qualified release. It keeps the name upstream's tooling expects, and `uv python install` is told to resolve it.
+  - **`edge`** — moves with every release, so it is never behind `latest-release`. Opt-in; see [Channels](running.md#channels).
+- **Vocabulary** — *device-qualified* is the one term for the evidence; it matches `qualification/` and `qualify.py`.
+- **Pre-release flag** — GitHub's flag is only a mechanism: it keeps such a release off the "Latest" badge and `releases/latest`, so they agree with `latest-release`. It is not a stage that ends, because promotion is a new tag.
+- **Not "prerelease"** — to uv that word means a CPython alpha, beta, or release candidate, so prose here says *not device-qualified*.
 - **Notes are generated** — from the build receipts, because they state the minimum Android API per build. The floor can move without anyone deciding to move it; the notes are where that becomes visible.
 
 ### The Device Qualification Gate
@@ -162,7 +167,7 @@ $ ./update-pins.py --write    # move the pins to the newest patch of the series
 - **Never raises** — a probe that cannot start is recorded as a failure rather than losing the receipt.
 - **The receipt records** — interpreter identity; every module `configure` said it built, importing; every shared library `dlopen`ed; a subprocess spawned; `pip` and `venv` exercised; the whole prefix copied to a deeper path and re-checked.
 - **Location** — `qualification/<tag>/cpython-<version>-<triple>[-<build option>].json`, named after the artifact stem so a directory says which Python each receipt qualified.
-- **The gate** — the release workflow refuses to publish unless a receipt covers **every artifact in the release by SHA-256**, or the waiver is allowed and the release goes out as a prerelease that says it has none ([below](#releasing-without-one)).
+- **The gate** — the release workflow refuses to publish unless a receipt covers **every artifact in the release by SHA-256**, or the waiver is allowed and the release goes out saying it is not device-qualified ([below](#releasing-without-one)).
 - **Evidence for bytes only** — a receipt names the bytes it covers, so one produced against an earlier build cannot be carried forward silently.
 - **Also checked** — the device's ABI is one this project releases for, and the interpreter reported the API level the build declares.
 
@@ -181,11 +186,11 @@ A device receipt cannot be produced unattended, so the gate is the one thing bet
 - **Only `upstream-only` rests on an earlier receipt** — the launcher, loader normalization, metadata overlay, curation, and license set are the code that was qualified, so the residual risk belongs to upstream.
 - **`changed` and `never-run`** — the risk may be this project's own, and the notes say the code that assembled the interpreter is not known to be the code a device ran.
 - **What CI checks** — the same in all three: every archive is byte-reproducible and holds to the distribution contract.
-- **No refusals** — `changed` and `never-run` publish rather than refuse. A refusal would end unattended releases at the first commit touching anything but a pin, and protect nobody the prerelease channel does not: those bytes stay out of what `uv python install` resolves either way.
+- **No refusals** — `changed` and `never-run` publish rather than refuse. A refusal would end unattended releases at the first commit touching anything but a pin, and protect nobody that keeping them off `latest-release` does not: those bytes stay out of what `uv python install` resolves either way.
 - **`pythonbuild/waiver.py`** — decides between the first two. Its polarity is deliberate: it names what is *allowed* to differ and drops the claim on everything else, so a file nobody considered fails closed.
 - **Deliberately outside the allowance** — `config/toolchain.lock.json` is upstream in origin but not in effect: an NDK bump changes every compiled byte and can move the API floor.
 - **A moved floor** — drops the allowance by itself: a different floor is a different set of devices, which unchanged packaging does not stand in for.
-- **Prerelease** — a release without a receipt never becomes the default. Its notes open with the fact, and `latest-release` and the uv catalogs stay at the last qualified release, so `uv python install` keeps resolving to bytes a device ran and taking one is an explicit act.
+- **Not the default** — a release without a receipt never becomes the default. Its notes open with the fact, GitHub marks it Pre-release, and `latest-release` stays at the last device-qualified release, so `uv python install` keeps resolving to bytes a device ran. Taking one is an explicit act: its own catalog, or the `edge` channel.
 - **Promotion** — a published tag cannot be released again, so promoting means qualifying a build of the same inputs on a device under a fresh tag, committing the receipt, and releasing that tag without the waiver.
 - **Verdict file** — `<build>.qualification.json` travels with the artifacts, footing and reason included, rather than being inferred from what the operator asked for.
 - **Release-level verdict** — a release is qualified when every build in it was; otherwise the notes take their wording from the weakest build's footing.
@@ -202,7 +207,7 @@ $ gh variable set AUTO_RELEASE --body true
 ```
 
 - **Second brake, `release` environment** — gates the release workflow itself. It has no required reviewers today, so it asks nobody; giving it some puts a person back in the loop without touching anything else.
-- **Still manual** — merging the pull request `update-pins` opens, and everything that needs a device: a release this produces is a prerelease until somebody qualifies its bytes.
+- **Still manual** — merging the pull request `update-pins` opens, and everything that needs a device: a release this produces is not device-qualified until somebody qualifies its bytes.
 
 ## uv Integration
 

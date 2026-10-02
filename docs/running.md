@@ -38,7 +38,7 @@ $ uv python install cpython-<version>-linux-aarch64-none \
 
 - **Catalogs** — `download-metadata.json` is the flagship; `download-metadata-upstream.json` is the baseline.
 - **Resolves to** — the newest device-qualified release.
-- **Prereleases** — one published without a receipt is left out, so `uv python install` never lands on bytes no device ran; see [Releasing Without One](technotes.md#releasing-without-one).
+- **Not device-qualified** — a release published without a receipt is left out, so `uv python install` never lands on bytes no device ran; see [Releasing Without One](technotes.md#releasing-without-one).
 - **Other ways to set it** — `UV_PYTHON_DOWNLOADS_JSON_URL`, or the `python-downloads-json-url` key in `uv.toml`.
 - **Identity** — the catalog says `linux` because uv has no Android key; the installed interpreter reports its real identity:
 
@@ -47,6 +47,25 @@ $ python -c "import sysconfig; print(sysconfig.get_config_var('SOABI'))"
 cpython-314-aarch64-linux-android
 $ python -c "import sysconfig; print(sysconfig.get_platform())"
 android-<api>-arm64_v8a
+```
+
+## Channels
+
+Two branches carry the catalogs, under the same file names:
+
+| Branch | Follows | Use when |
+| --- | --- | --- |
+| `latest-release` | the newest device-qualified release | you want only what a device ran |
+| `edge` | the newest release of any kind | you want the newest CPython and accept that no device may have run it |
+
+- **Switching** — replace `latest-release` with `edge` in the catalog URL.
+- **Qualified releases** — move both, so `edge` is never behind.
+- **Marking** — GitHub shows a release that is not device-qualified as Pre-release, and its notes open with what it stands on.
+
+```console
+$ uv python install cpython-<version>-linux-aarch64-none \
+    --python-downloads-json-url \
+    https://raw.githubusercontent.com/daylight-00/python-build-standalone-android/edge/download-metadata.json
 ```
 
 ## Directly
