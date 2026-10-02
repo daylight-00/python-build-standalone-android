@@ -208,7 +208,10 @@ def build_python_json(
                     "objs": [],
                     "required": False,
                     "shared_lib": "install/" + path.relative_to(install).as_posix(),
-                    "variant": "shared-library",
+                    # Upstream's name for the one variant a module has when it is
+                    # not built more than one way. How it loads is said by
+                    # `python_extension_module_loading`, not here.
+                    "variant": "default",
                 }
             )
 
