@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """Render release notes from the build receipts of a release.
 
     ./release-notes.py --tag 20260727 --dist-dir incoming
@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from pythonbuild import waiver
 from pythonbuild.catalog import CATALOG_FLAVOR
 from pythonbuild.qualification import previous_qualified_tag, shipped_api_levels
 from pythonbuild.targets import DEFAULT_BUILD_OPTION, Build, load_builds
@@ -34,8 +35,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--dist-dir", default="dist", type=Path)
     parser.add_argument(
         "--previous-tag",
-        help="tag to compare API floors against; defaults to the newest earlier tag "
-        "that has a committed qualification receipt",
+        help="tag to compare API floors against; defaults to the release the gate "
+        "compared against, or else the newest earlier tag with a committed "
+        "qualification receipt",
     )
     parser.add_argument("--repository", default=REPOSITORY)
     parser.add_argument(
@@ -71,39 +73,134 @@ def _resolve(receipt: dict[str, Any], builds: dict[str, Build]) -> Build:
     return build
 
 
-def _unqualified_callout() -> list[str]:
-    """A release nobody ran has to say so before it says anything else."""
-    return [
-        "> [!CAUTION]",
-        "> **No device qualification receipt covers these archives.** Every release "
-        "before this one was run on a physical device first; this one was not.",
-        ">",
-        "> It was published because nothing but the pinned CPython input changed "
-        "since the last release that was — so the launcher, the loader "
-        "normalization, the metadata overlay and the licence set are the same code "
-        "a device did run. What is unverified is whatever came with the new "
-        "upstream: that every extension module still loads, that the compiled-in "
-        "trust store still resolves, and that the prefix still relocates.",
-        ">",
-        "> `uv python install` is unaffected — the catalogs still resolve to the "
-        "last qualified release. Taking this one is an explicit choice: download "
-        "an archive, or point `--python-downloads-json-url` at this tag.",
-        "",
+def _weakest_waiver(verdicts: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The claim a release with several builds can make is its weakest build's."""
+    waivers = [
+        verdict["waiver"]
+        for verdict in verdicts
+        if verdict.get("device_qualified") is not True
+        and verdict.get("waiver", {}).get("basis") in waiver.BASES
     ]
+    return max(
+        waivers, key=lambda found: waiver.BASES.index(found["basis"]), default=None
+    )
+
+
+def _label(build: Build) -> str:
+    return (
+        "the flagship build"
+        if build.build_option == DEFAULT_BUILD_OPTION
+        else f"the `{build.build_option}` build"
+    )
+
+
+def _unqualified(
+    pairs: list[tuple[dict[str, Any], Build]], verdicts: list[dict[str, Any]]
+) -> list[Build]:
+    """The builds no device receipt covers.
+
+    A build is qualified only if the gate said so. One the gate recorded nothing
+    about is not given the benefit of the doubt: this is the line a reader trusts.
+    """
+    qualified = {v["build"] for v in verdicts if v.get("device_qualified") is True}
+    return [build for _, build in pairs if build.name not in qualified]
+
+
+def _baseline(verdicts: list[dict[str, Any]]) -> str | None:
+    """The release the gate compared against, when it recorded exactly one.
+
+    The notes compare floors against the same release the gate compared files
+    against. The newest tag with a receipt may be a candidate nobody released.
+    """
+    tags = {
+        v["waiver"]["previous_tag"]
+        for v in verdicts
+        if v.get("waiver", {}).get("previous_tag")
+    }
+    return tags.pop() if len(tags) == 1 else None
+
+
+def _unqualified_callout(
+    found: dict[str, Any] | None, unqualified: list[Build], total: int
+) -> list[str]:
+    """A release nobody ran has to say so before it says anything else.
+
+    What follows the first sentence depends on the footing: a release that moved
+    only upstream's pin can say the rest of the code is what a device ran, and one
+    that cannot must not. With no recorded footing at all it claims nothing.
+    """
+    if len(unqualified) == total:
+        ran = "None of them was run on a physical device."
+    else:
+        names = " and ".join(_label(build) for build in unqualified)
+        verb = "was" if len(unqualified) == 1 else "were"
+        ran = f"{names[0].upper()}{names[1:]} {verb} not run on a physical device."
+    lines = [
+        "> [!CAUTION]",
+        f"> **Not device-qualified.** {ran}",
+        ">",
+    ]
+    basis = found["basis"] if found else None
+    if found and basis == waiver.UPSTREAM_ONLY:
+        lines.extend(
+            [
+                "> - **Basis** — only the pinned CPython input changed since "
+                f"`{found['previous_tag']}`, which a device ran. The launcher, loader "
+                "normalization, metadata overlay, and license set are the same code.",
+                "> - **Unverified** — what came with the new upstream: extension "
+                "modules loading, the trust store resolving, the prefix relocating.",
+            ]
+        )
+    elif found and basis == waiver.CHANGED:
+        lines.extend(
+            [
+                f"> - **Basis** — none: {found['reason']}.",
+                "> - **Unverified** — that this project's own code works on a device: "
+                "nothing here vouches that it does.",
+            ]
+        )
+    elif found and basis == waiver.NEVER_RUN:
+        lines.extend(
+            [
+                f"> - **Basis** — none: {found['reason']}.",
+                "> - **Unverified** — that it works on a device: nothing here "
+                "vouches that it does.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "> - **Basis** — none recorded.",
+                "> - **Unverified** — that it works on a device: nothing here "
+                "vouches that it does.",
+            ]
+        )
+    lines.extend(
+        [
+            "> - **Checked by CI** — every archive is byte-reproducible and holds "
+            "to the distribution contract.",
+            "> - **`uv python install`** — unaffected: the catalogs still resolve to "
+            "the last qualified release. Use this release's own catalog, below, to "
+            "take it.",
+            "",
+        ]
+    )
+    return lines
 
 
 def _floor_callout(previous: str, moved: list[tuple[str, int, int]]) -> list[str]:
     """A floor that moved without anyone deciding to move it has to be unmissable."""
-    detail = "; ".join(
-        f"{label} moved from API {before} to API {after}"
-        for label, before, after in moved
-    )
     return [
         "> [!IMPORTANT]",
-        f"> **The minimum Android API changed since `{previous}`:** {detail}.",
-        "> Neither floor is chosen by this project — one is inherited from the official",
-        "> package and the other follows CPython's own feature detection — so a device",
-        "> that ran the previous release may not be able to run this one.",
+        f"> **The minimum Android API changed since `{previous}`.**",
+        ">",
+        *(
+            f"> - {label} moved from API {before} to API {after}"
+            for label, before, after in moved
+        ),
+        "> - **Why** — neither floor is chosen by this project: one is inherited from "
+        "the official package, the other follows CPython's own feature detection.",
+        "> - **Effect** — a device that ran the previous release may not run this one.",
         "",
     ]
 
@@ -119,9 +216,7 @@ def _floors_that_moved(
     before = shipped_api_levels(previous)
     return [
         (
-            "the flagship build"
-            if build.build_option == DEFAULT_BUILD_OPTION
-            else f"the `{build.build_option}` build",
+            _label(build),
             before[build.artifact_infix],
             receipt["android_api"]["level"],
         )
@@ -138,6 +233,7 @@ def render(
     previous_tag: str | None = None,
     *,
     device_qualified: bool = True,
+    verdicts: list[dict[str, Any]] | None = None,
 ) -> str:
     builds = load_builds()
     # Ordered by build, flagship first, rather than by whatever order the receipts
@@ -154,8 +250,13 @@ def render(
         )
     ]
     lines: list[str] = []
+    unqualified = [] if device_qualified else _unqualified(pairs, verdicts or [])
     if not device_qualified:
-        lines.extend(_unqualified_callout())
+        lines.extend(
+            _unqualified_callout(
+                _weakest_waiver(verdicts or []), unqualified, len(pairs)
+            )
+        )
 
     # Above everything else, because a reader who takes in nothing but the first
     # paragraph still has to learn that their device may have dropped out.
@@ -190,15 +291,21 @@ def render(
             if build.build_option == DEFAULT_BUILD_OPTION
             else "the baseline"
         )
-        lines.append(f"`{build.name}`, {label}:")
+        # An unqualified build is not on `latest-release`, so that catalog would
+        # install something else. Its own is a release asset.
+        if build in unqualified:
+            catalog = f"https://github.com/{repository}/releases/download/{tag}"
+            lines.append(f"`{build.name}`, {label}, from this release's own catalog:")
+        else:
+            catalog = f"https://raw.githubusercontent.com/{repository}/latest-release"
+            lines.append(f"`{build.name}`, {label}:")
         lines.append("")
         lines.append(
             f"```console\n"
             f"$ uv python install cpython-{receipt['flavors']['full']['python_version']}"
             f"-linux-{build.arch}-none \\\n"
             f"    --python-downloads-json-url \\\n"
-            f"    https://raw.githubusercontent.com/{repository}/latest-release/"
-            f"{build.uv_catalog}\n"
+            f"    {catalog}/{build.uv_catalog}\n"
             f"```"
         )
         lines.append("")
@@ -223,16 +330,13 @@ def render(
     lines.append(f"$ gh attestation verify <archive> --repo {repository}")
     lines.append("```")
     lines.append("")
+    lines.append("- Every archive was built twice and compared byte for byte.")
     if device_qualified:
         lines.append(
-            "Every archive was built twice and compared byte for byte, and each build "
-            "was run on a physical device before this release was cut."
+            "- Each build was run on a physical device before this release was cut."
         )
     else:
-        lines.append(
-            "Every archive was built twice and compared byte for byte. None of them was "
-            "run on a device — see the caution above."
-        )
+        lines.append("- The caution above says which builds were not run on a device.")
 
     return "\n".join(lines) + "\n"
 
@@ -246,13 +350,23 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     receipts = [read_json_object(path) for path in paths]
+    # What the release gate recorded about each build, next to the artifacts. The
+    # tag is read out of the verdict: the file is named after the build alone.
+    verdicts = [
+        verdict
+        for verdict in map(
+            read_json_object, sorted(args.dist_dir.rglob("*.qualification.json"))
+        )
+        if verdict.get("tag") == args.tag
+    ]
 
     notes = render(
         receipts,
         args.tag,
         args.repository,
-        args.previous_tag,
+        args.previous_tag or _baseline(verdicts),
         device_qualified=not args.not_device_qualified,
+        verdicts=verdicts,
     )
     if args.output:
         args.output.write_text(notes, encoding="utf-8")
