@@ -1,99 +1,51 @@
-# Support Status
+# Project Status
 
-## Status
+## Qualification
 
-Two releases are published. `20260729` is current and carries both builds;
-`20260728` carries `upstream` alone. The earlier one is superseded and left in
-place — a published name has to keep serving the bytes it was published with,
-because the uv catalog pins them by hash.
-
-Publishing is gated on a device qualification receipt covering every artifact in
-the release by SHA-256, and the receipts are committed under
-`qualification/<tag>/cpython-<version>-<build>.json`. A receipt is evidence only
-for the bytes it names, so what follows describes the artifacts a release
-actually shipped rather than the project in general.
-
-A release may also be published without one, when nothing but the pinned CPython
-input has changed since the last release that had one. Such a release is marked
-as a prerelease, says so at the top of its notes, and does **not** become what
-`uv python install` resolves to — the catalogs keep pointing at the last
-qualified release. So the scope below describes qualified releases; a prerelease
-is what it says on its own notes. See
-[releasing without one](technotes.md#releasing-without-one).
-
-The predecessor research repository qualified equivalent artifacts on real
-hardware, but those receipts are bound to bytes produced by a different
-toolchain on a different host. They do not carry over.
+- **Gate** — publishing needs a device qualification receipt covering every artifact by SHA-256, committed under `qualification/<tag>/`.
+- **Evidence** — a receipt covers only the bytes it names, so this page describes what a release shipped, not the project in general.
+- **Without a receipt** — allowed, so a new CPython need not wait for a device; see [Releasing Without One](technotes.md#releasing-without-one).
+  - It is a prerelease; the top of its notes says what it stands on.
+  - The catalogs keep pointing at the last qualified release, so `uv python install` never resolves to it.
+  - The scope below describes qualified releases; a prerelease is what its own notes say.
 
 ## Builds
 
 One triple, `aarch64-linux-android`, `arm64-v8a` only.
 
-| Build option | Minimum Android | Where the minimum comes from |
+| Build Option | Minimum Android | Where the Minimum Comes From |
 | --- | --- | --- |
 | `upstream` | 7.0 (API 24) | inherited from the official Python.org package |
 | *(none)* | 14 (API 34) | the last API level that changes the CPython build |
 
-The `extended` build that the [README](../README.md) and
-[`technotes.md`](technotes.md) describe is planned and unpublished. Nothing here
-covers it, and this table gains a row when it ships.
+- **`upstream` is permanent** — a baseline, not a stepping stone: one build whose device coverage is upstream's responsibility, kept as long as the official package exists.
+- **Neither minimum is chosen here** — either can move without a decision in this repository: upstream may raise its floor, or a future CPython may add a configure check for a higher-API function. See [the API policy](technotes.md#the-android-api-policy).
+- **Floor changes** — the release notes call them out prominently.
+- **A floor is not a validation** — a distribution compiled for API 24 is expected to run on Android 7, but that is a toolchain-contract property until a device says otherwise.
 
-`upstream` is a permanent baseline, not a stepping stone. It exists so there is
-always a build whose device coverage is upstream's responsibility rather than
-this project's, and it stays as long as the official package does.
+## Not Supported
 
-Neither minimum is chosen here, which means either can move without a decision
-in this repository — if upstream raises its floor, or a future CPython adds a
-configure check for a higher-API function. A floor change is called out
-prominently in the release notes.
+Deliberate boundaries, not gaps waiting to be filled:
 
-A minimum API is a build floor. A build floor is not a device validation: a
-distribution compiled for API 24 is expected to run on Android 7, but that is a
-property of the toolchain contract until a device says otherwise.
+- **Android ABIs other than `arm64-v8a`** — no `armeabi-v7a`, no `x86_64`.
+- **16 KiB page-size devices at runtime** — every ELF is built and checked for 16 KiB program-segment alignment, so distributions are statically compatible; running under a 16 KiB kernel is neither supported nor qualified.
+- **General `multiprocessing`** — Android's process and IPC restrictions make the general case unsupportable; specific patterns may work and are not promised.
+- **Portability or repair of user-built native wheels** — a wheel built on one device against this distribution is not promised to load on another; wheel repair is an external tool's responsibility.
+- **APK and JNI packaging** — the distributions are a command-line runtime.
+- **Build variants** — no PGO, LTO, BOLT, debug, free-threaded, or JIT build; one build option per provenance is the whole axis.
+- **Detached symbols or a separate debug distribution** — the stripped flavor drops them; nothing republishes them.
+- **A bundled cross-build NDK, SDK, or sysroot** — the build resolves a pinned NDK and says how to install it; it does not carry one.
 
-## Not supported
+## Runtime Contexts
 
-These are deliberate boundaries, not gaps waiting to be filled:
-
-- **Android ABIs other than `arm64-v8a`.** No `armeabi-v7a`, no `x86_64`.
-- **16 KiB page-size devices at runtime.** Every ELF is built and checked for
-  16 KiB program-segment alignment, so the distributions are statically
-  compatible. That is a static property. Running under a 16 KiB kernel is not
-  supported and not qualified.
-- **General `multiprocessing`.** Android's process and IPC restrictions make the
-  general case unsupportable; specific patterns may work and are not promised.
-- **Portability or repair of user-built native wheels.** A wheel built on one
-  device against this distribution is not promised to load on another. Wheel
-  repair is an external tool's responsibility.
-- **APK and JNI packaging.** The distributions are a command-line runtime.
-- **Build variants.** No PGO, LTO, BOLT, debug, free-threaded, or JIT build.
-  One build option per provenance is the whole axis.
-- **Detached symbols or a separate debug distribution.** The stripped flavor
-  drops them; nothing republishes them.
-- **A bundled cross-build NDK, SDK, or sysroot.** The build resolves a pinned
-  NDK and says how to install it; it does not carry one.
-
-## Runtime contexts
-
-Termux on `arm64-v8a` is the context the distributions are designed for and the
-one every release is qualified against. The flagship build compiles in
-Termux's CA and time zone paths as overridable defaults for that reason.
-
-That is a convenience, not a dependency: the runtime needs no Termux prefix and
-links no Termux native library. Other Android contexts — an app-UID native
-shell, `adb shell`, an emulator — are neither qualified nor excluded. They may
-work. They are not checked, so nothing is promised.
+- **Termux on `arm64-v8a`** — the context the distributions are designed for and the one every device qualification runs against.
+- **Compiled-in default** — for that reason the flagship build compiles in Termux's CA path, overridable; the time zone path stays at CPython's default.
+- **No Termux dependency** — the runtime needs no Termux prefix and links no Termux native library.
+- **Other contexts** — an app-UID native shell, `adb shell`, an emulator: neither qualified nor excluded. They may work; nothing is promised.
 
 ## Reporting
 
-Report problems on the [issue tracker][issues]. A useful report states the build
-option, the release tag, the archive flavor, the Android version, and the
-runtime context.
-
-Security issues follow [`SECURITY.md`](../SECURITY.md).
-
-CPython security fixes are upstream's; this project consumes them by rebuilding
-from a new upstream release. The project owns the packaging, the loader
-normalization, and the release integrity.
+- **Problems** — the [issue tracker][issues]; state the build option, release tag, archive flavor, Android version, and runtime context.
+- **Security** — [`SECURITY.md`](../SECURITY.md), which also says who owns which surface.
 
 [issues]: https://github.com/daylight-00/python-build-standalone-android/issues

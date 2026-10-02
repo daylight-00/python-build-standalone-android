@@ -89,17 +89,20 @@ $ ./update-pins.py [--write]                               # follow python.org's
 ```
 
 `just` recipes wrap these; `just --list` shows them. Releases are manual,
-gated, and default to a dry run — see `.github/workflows/release.yml`.
+gated, and default to a dry run — see `.github/workflows/release.yml`. The one
+thing that dispatches it is `auto-release.yml`, which does nothing until the
+`AUTO_RELEASE` repository variable is `true`.
 
 Building from source needs an Android NDK at the pinned revision; the build
 prints how to install it if it cannot find one.
 
 ## Commits
 
-Angular convention: `type(scope): summary` in the imperative. Write body
-paragraphs as single lines with blank lines between them — GitHub renders a
+Angular convention: `type(scope): summary` in the imperative. Write the body as
+short bullets, one line each, with no hard wrapping — GitHub renders a
 hard-wrapped body as broken lines. Say what changed and why it was worth
-changing; if a fix came from a diagnosis, the diagnosis is the interesting part.
+changing; if a fix came from a diagnosis, lead with the diagnosis. Pull request
+descriptions and release notes follow the same bullet style.
 
 [pbs]: https://github.com/astral-sh/python-build-standalone
 [research]: https://github.com/daylight-00/cpython-android-cli

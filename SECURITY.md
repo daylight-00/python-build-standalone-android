@@ -2,11 +2,8 @@
 
 ## Reporting
 
-Report a vulnerability through [GitHub's private advisory form][advisory]. Do
-not open a public issue for one.
-
-Include the release tag, the target, the archive flavor, and enough detail to
-reproduce.
+- **How** — GitHub's [private advisory form][advisory]. Do not open a public issue.
+- **Include** — release tag, target, archive flavor, and enough detail to reproduce.
 
 ## Ownership
 
@@ -17,15 +14,13 @@ reproduce.
 | Packaging, loader normalization, launcher, metadata | this project | fix and re-release |
 | Release integrity | this project | pinned inputs, reproducible builds, checksums, provenance attestations |
 
-A CPython security release is consumed by rebuilding from the new upstream
-input, not by patching a distribution in place. Published artifacts are never
-mutated: a correction is a new release, and the superseded one is marked, not
-edited.
+- **CPython fixes** — consumed by rebuilding from the new upstream input, never by patching a distribution in place.
+- **Published artifacts** — never mutated. A correction is a new release.
 
-## Verifying a release
+## Verifying a Release
 
-Every release publishes `SHA256SUMS` alongside its archives, and every archive
-carries a build-provenance attestation:
+- Every release publishes `SHA256SUMS` beside its archives.
+- Every archive carries a build-provenance attestation.
 
 ```console
 $ sha256sum -c SHA256SUMS --ignore-missing
