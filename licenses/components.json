@@ -1,10 +1,9 @@
 {
   "schema_version": 1,
-  "note": "Every component whose code the distributions carry, and the license text shipped for it. The texts are copied verbatim into python/licenses/ in each archive. When a component version changes, the corresponding text is refreshed from the origin recorded here.",
+  "note": "Every component whose code the distributions carry, and the license text shipped for it. The texts are copied verbatim into python/licenses/ in each archive. The version of every component the locks pin is filled in from those locks when the archive is assembled, so it is not typed here; when one changes, the corresponding text is refreshed from the origin recorded here.",
   "components": [
     {
       "component": "cpython",
-      "version": "3.14.6",
       "spdx": ["Python-2.0", "CNRI-Python"],
       "file": "LICENSE.cpython.txt",
       "origin": "LICENSE in the CPython source distribution",
@@ -34,7 +33,6 @@
     },
     {
       "component": "openssl",
-      "version": "3.5.7",
       "spdx": ["Apache-2.0"],
       "file": "LICENSE.openssl-3.txt",
       "origin": "LICENSE.txt in the OpenSSL source distribution",
@@ -42,7 +40,6 @@
     },
     {
       "component": "sqlite",
-      "version": "3.50.4",
       "spdx": [],
       "classification": "public domain",
       "file": "LICENSE.sqlite.txt",
@@ -51,7 +48,6 @@
     },
     {
       "component": "bzip2",
-      "version": "1.0.8",
       "spdx": ["bzip2-1.0.6"],
       "file": "LICENSE.bzip2.txt",
       "origin": "LICENSE in the bzip2 source distribution",
@@ -59,7 +55,6 @@
     },
     {
       "component": "libffi",
-      "version": "3.4.4",
       "spdx": ["MIT"],
       "file": "LICENSE.libffi.txt",
       "origin": "LICENSE in the libffi source distribution",
@@ -67,7 +62,6 @@
     },
     {
       "component": "liblzma",
-      "version": "5.4.6",
       "spdx": [],
       "classification": "public domain",
       "file": "LICENSE.liblzma.txt",
@@ -77,7 +71,6 @@
     },
     {
       "component": "zstd",
-      "version": "1.5.7",
       "spdx": ["BSD-3-Clause"],
       "file": "LICENSE.zstd.txt",
       "origin": "LICENSE in the zstd source distribution",

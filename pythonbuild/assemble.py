@@ -26,6 +26,7 @@ from .archive import (
     write_tar_gz,
     write_tar_zst,
 )
+from .dependencies import RECIPE_LOCK
 from .elf import elf_objects, is_elf, set_relative_runpaths, strip_object, tool_identity
 from .launcher import build_launcher
 from .modules import check_shared_modules
@@ -52,6 +53,10 @@ RECORDS = "build/records"
 # flavor.
 LICENSES = "licenses"
 LICENSE_SOURCE = ROOT / "licenses"
+
+# The manifest names `liblzma` where the recipe lock names the package it comes
+# from. Every other recipe is called the same in both.
+LICENSE_COMPONENT = {"xz": "liblzma"}
 
 # What a build tree is called once it is inside an archive. The same string is
 # given to the compiler as -ffile-prefix-map, so generated text and compiled
@@ -115,7 +120,48 @@ def _install_launcher(
     return aliases
 
 
-def _install_licenses(install: Path) -> dict[str, Any]:
+def license_versions(
+    python_version: str, recipe_lock: Path = RECIPE_LOCK
+) -> dict[str, str]:
+    """The version of every component the pinned inputs name, by manifest name."""
+    versions = {"cpython": python_version}
+    for recipe in read_json_object(recipe_lock)["components"]:
+        name = LICENSE_COMPONENT.get(recipe["name"], recipe["name"])
+        versions[name] = recipe["version"]
+    return versions
+
+
+def stamp_versions(
+    manifest: dict[str, Any], versions: dict[str, str]
+) -> dict[str, Any]:
+    """The manifest with the pinned inputs' versions filled in.
+
+    A version typed into the manifest for a component the locks pin is refused
+    rather than overwritten: the value it would have disagreed with is the one it
+    was copied from, which is how it went stale. And a pinned component with no
+    entry is refused, because it would ship without a license text.
+    """
+    components = manifest["components"]
+    present = {component["component"] for component in components}
+    missing = sorted(set(versions) - present)
+    if missing:
+        raise RuntimeError(f"pinned components with no license entry: {missing}")
+    stamped = []
+    for component in components:
+        name = component["component"]
+        if name not in versions:
+            stamped.append(component)
+            continue
+        if "version" in component:
+            raise RuntimeError(
+                f"license manifest types a version for {name}, which the locks "
+                f"already pin; remove it and let assembly fill it in"
+            )
+        stamped.append({**component, "version": versions[name]})
+    return {**manifest, "components": stamped}
+
+
+def _install_licenses(install: Path, versions: dict[str, str]) -> dict[str, Any]:
     """Copy the per-component license texts into the prefix."""
     manifest = LICENSE_SOURCE / "components.json"
     if not manifest.is_file():
@@ -129,12 +175,13 @@ def _install_licenses(install: Path) -> dict[str, Any]:
         rows.append(
             {"path": f"{LICENSES}/{source.name}", "sha256": sha256_path(source)}
         )
-    shutil.copyfile(manifest, target / manifest.name)
+    stamped = stamp_versions(read_json_object(manifest), versions)
+    write_json(target / manifest.name, stamped)
     os.chmod(target / manifest.name, 0o644)
 
     declared = {
         component["file"]
-        for component in read_json_object(manifest)["components"]
+        for component in stamped["components"]
         if component.get("file")
     }
     shipped = {Path(row["path"]).name for row in rows}
@@ -329,7 +376,7 @@ def assemble_full(context: BuildContext, source: PrefixSource) -> dict[str, Any]
         )
         config_vars_source = sysconfig_vars_json(install, python_mm)
         pip = install_bundled_pip(install, python_mm)
-        licenses = _install_licenses(install)
+        licenses = _install_licenses(install, license_versions(python_version))
         runpaths = set_relative_runpaths(
             install, str(context.toolchain.patchelf), str(context.toolchain.readelf)
         )
