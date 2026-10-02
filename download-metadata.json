@@ -1,0 +1,19 @@
+{
+  "cpython-3.14.7-linux-aarch64-none": {
+    "arch": {
+      "family": "aarch64",
+      "variant": null
+    },
+    "build": "20261002",
+    "libc": "none",
+    "major": 3,
+    "minor": 14,
+    "name": "cpython",
+    "os": "linux",
+    "patch": 7,
+    "prerelease": "",
+    "sha256": "0aa16d28247da93e467f0c31da0a73b41b1493395d83fb06c5e35ae148b5ac7e",
+    "url": "https://github.com/daylight-00/python-build-standalone-android/releases/download/20261002/cpython-3.14.7%2B20261002-aarch64-linux-android-install_only_stripped.tar.gz",
+    "variant": null
+  }
+}
