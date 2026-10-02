@@ -2,11 +2,12 @@ name: update-pins
 
 # Follow python.org's newest patch of the pinned series, unattended.
 #
-# A patch bump moves the pinned bytes and nothing else, which is the one case the
-# release waiver covers: everything from here on is automatic — the build
-# workflow builds and validates the PR, and the api-level workflow re-measures
-# the floor because `config/**` changed. A device is needed only to take the
-# resulting release out of prerelease.
+# A patch bump moves the pinned bytes and nothing else, which is the case the
+# release waiver was written for. The build workflow builds and validates the
+# pull request, and the api-level workflow re-measures the floor because
+# `config/**` changed. Once it is merged, auto-release.yml can release it if it
+# has been turned on, and a device is needed only to take the result out of
+# prerelease.
 #
 # It opens a pull request rather than committing to main. The point of the
 # automation is to notice, not to decide.
@@ -54,6 +55,9 @@ jobs:
         if: ${{ github.event_name == 'schedule' || inputs.write }}
         id: follow
         run: |
+          # Without pipefail the pipe reports `tee`'s status, so a write that failed
+          # half way would still go on to open a pull request.
+          set -euo pipefail
           uv run ./update-pins.py --write | tee pins.log
           # Assigned first: `echo "x=$(git ...)"` would report echo's status.
           changed=$(git status --porcelain -- config ci-targets.yaml | wc -l)
@@ -70,6 +74,11 @@ jobs:
           print(read_json_object(get_build('aarch64-linux-android').input_lock_path())['python']['version'])
           ")
           branch="pins/cpython-$version"
+          # The weekly run finds the same bump every week until somebody merges it.
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            echo "$branch exists already; leaving the pull request to be merged"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"

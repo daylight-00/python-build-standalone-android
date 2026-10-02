@@ -1,0 +1,140 @@
+name: auto-release
+
+# Release the pinned CPython without waiting for a person or a device.
+#
+# A pin bump lands on main, nothing carries the version it pinned, and this
+# dispatches the release workflow for it: unattended, with the device gate
+# waived. What that publishes is a prerelease whose notes say what it stands on,
+# and the uv catalogs are left alone, so nothing here can make `uv python
+# install` resolve to bytes a device did not run. Promoting a release is still a
+# person with a device.
+#
+# Two brakes, both off by default for a release, which cannot be taken back:
+#
+#   - the repository variable AUTO_RELEASE has to be "true". Until it is, this
+#     workflow does nothing at all, so merging it does not start releasing.
+#   - the `release` environment gates the release workflow itself. Giving it
+#     required reviewers puts a person back in the loop without touching this.
+#
+# It is idempotent, which is what lets the schedule double as a retry: a release
+# is only dispatched while some pinned version has no published release, so a
+# run that finds nothing to do is a few seconds of API calls.
+
+on:
+  push:
+    branches: [main]
+    paths: ["config/**"]
+  schedule:
+    # Daily. A release that failed is retried the next morning; otherwise a no-op.
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+env:
+  FORCE_COLOR: 1
+
+permissions: {}
+
+# Two runs deciding at once would both find no release and dispatch twice.
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: release the pinned version if nothing has
+    if: ${{ vars.AUTO_RELEASE == 'true' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Starting the release workflow. A workflow_dispatch made with the job's
+      # own token is allowed to start a run; a push or pull request is not.
+      actions: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
+      - name: Decide whether anything needs releasing
+        id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # An API error has to stop this step. Without -e and pipefail, a failed
+          # `gh` reads as "nothing published" and dispatches a release over one.
+          set -euo pipefail
+
+          # Every version a build pins, one per line. Read from the locks rather
+          # than from a release, because the pin is what a release has to follow.
+          versions=$(uv run python -c "
+          from pythonbuild.targets import load_builds
+          from pythonbuild.utils import read_json_object
+          print(*sorted({
+              read_json_object(build.input_lock_path())['python']['version']
+              for build in load_builds().values()
+          }), sep='\n')
+          ")
+
+          # A draft is a release that is still being assembled, not one that exists.
+          published=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
+            --jq '.[] | select(.draft | not) | .assets[].name')
+
+          needed=false
+          for version in $versions; do
+            if grep -qF "cpython-$version+" <<< "$published"; then
+              echo "$version: already released"
+            else
+              echo "$version: no published release carries it"
+              needed=true
+            fi
+          done
+
+          # A release takes hours, and the one already running will publish it.
+          running=$(gh run list --workflow release.yml --json status \
+            --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$running" -gt 0 ]; then
+            echo "a release is already in flight"
+            needed=false
+          fi
+
+          # One dispatch a day, whatever came of it. The tag is a date, and a
+          # release that failed after creating its draft leaves a tag this token
+          # cannot see, so trying again the same day could publish a second
+          # release under it. Tomorrow's run tries again.
+          today=$(date -u +%Y-%m-%d)
+          dispatched=$(gh run list --workflow release.yml --created ">=$today" \
+            --json databaseId --jq length)
+          if [ "$dispatched" -gt 0 ]; then
+            echo "a release was already dispatched today"
+            needed=false
+          fi
+
+          # Assigned first, so that a failing `gh` stops the step instead of
+          # reading as a tag nobody has taken.
+          tag=$(date -u +%Y%m%d)
+          taken=$(gh release list --limit 200 --json tagName --jq '.[].tagName')
+          if grep -qx "$tag" <<< "$taken"; then
+            echo "$tag is already taken"
+            needed=false
+          fi
+
+          echo "needed=$needed" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch the release
+        if: ${{ steps.decide.outputs.needed == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.decide.outputs.tag }}
+        run: |
+          gh workflow run release.yml --ref main \
+            -f tag="$TAG" \
+            -f sha="$GITHUB_SHA" \
+            -f dry-run=false \
+            -f allow-waiver=true
+          echo "dispatched release $TAG at $GITHUB_SHA"

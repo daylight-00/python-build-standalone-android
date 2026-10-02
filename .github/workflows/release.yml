@@ -1,9 +1,11 @@
 name: release
 
 # Releases are manual and gated, as upstream's are. Nothing here runs on a push.
+# The one thing that dispatches it is auto-release.yml, and only once the
+# AUTO_RELEASE repository variable is turned on.
 #
-# `dry-run` defaults to true: this project has never published, and a release is
-# the one action in the repository that cannot be taken back.
+# `dry-run` defaults to true: a release is the one action in the repository that
+# cannot be taken back.
 on:
   workflow_dispatch:
     inputs:
@@ -21,9 +23,9 @@ on:
         default: true
       allow-waiver:
         description: >-
-          Publish without a device receipt when nothing but the pinned CPython
-          input has changed since the last qualified tag. Such a release is
-          marked as a prerelease and does not become what uv installs.
+          Publish without a device receipt. Such a release is marked as a
+          prerelease, its notes say what it stands on, and it does not become
+          what uv installs.
         type: boolean
         default: false
 
@@ -206,19 +208,24 @@ jobs:
       - name: Determine whether this release is device-qualified
         id: channel
         run: |
+          # `bash -e` alone does not fail a pipeline whose first command fails, so
+          # a jq that could not read a verdict would have counted as nothing.
+          set -euo pipefail
           # Parsed rather than pattern-matched. Grepping for `"device_qualified":
           # false` depended on how json.dumps happened to space and indent it, and
-          # this is the one decision in the release that must not fail open.
+          # this is the one decision in the release that must not fail open. So it
+          # counts the other way round: a build is qualified only if its verdict
+          # says so, and anything else is not.
           total=$(find incoming -name '*.qualification.json' | wc -l)
-          waived=$(find incoming -name '*.qualification.json' -print0 \
-            | xargs -0 -r jq -r 'select(.device_qualified != true) | .build' | wc -l)
+          qualified=$(find incoming -name '*.qualification.json' -print0 \
+            | xargs -0 -r jq -r 'select(.device_qualified == true) | .build' | wc -l)
           if [ "$total" -eq 0 ]; then
             echo "no qualification verdicts were recorded" >&2
             exit 1
           fi
-          if [ "$waived" -gt 0 ]; then
+          if [ "$qualified" -lt "$total" ]; then
             echo "qualified=false" >> "$GITHUB_OUTPUT"
-            echo "$waived of $total builds are not device-qualified"
+            echo "$((total - qualified)) of $total builds are not device-qualified"
           else
             echo "qualified=true" >> "$GITHUB_OUTPUT"
             echo "all $total builds are device-qualified"
@@ -309,8 +316,9 @@ jobs:
         run: |
           echo "$TAG is published as a prerelease and is not device-qualified."
           echo "latest-release and the uv catalogs still point at the last"
-          echo "qualified release. To promote it, qualify these exact artifacts"
-          echo "on a device, commit the receipt, and re-run without --allow-waiver."
+          echo "qualified release. A published tag cannot be released again, so to"
+          echo "promote this build, qualify it on a device under a fresh tag, commit"
+          echo "the receipt, and release that tag without --allow-waiver."
 
       - name: Dry run summary
         if: ${{ inputs.dry-run }}
