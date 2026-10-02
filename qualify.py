@@ -318,7 +318,7 @@ def evaluate(
 
     # Only a build that compiles these paths in is expected to resolve them with
     # nothing set. For one that ships an external data product, finding no trust
-    # store here is the documented behaviour rather than a fault.
+    # store here is the documented behavior rather than a fault.
     runtime_data = checks.get("runtime_data", {})
     if not runtime_data.get("pass"):
         failures.append("runtime_data")

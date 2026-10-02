@@ -6,7 +6,7 @@
 
 which is the same as: *the lowest level whose build decisions already match the
 highest level the pinned NDK can compile for*. Raising the floor past that point
-buys no behaviour and costs device coverage.
+buys no behavior and costs device coverage.
 
 That sentence is measured here rather than re-derived. The obvious alternative —
 reading ``AC_CHECK_FUNCS`` out of ``configure.ac`` and looking each name up in

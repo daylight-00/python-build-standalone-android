@@ -189,7 +189,7 @@ def _render_literal(values: dict[str, Any]) -> str:
 def _overlay_sysconfigdata(path: Path, layout: Layout) -> dict[str, Any]:
     before_text = path.read_text(encoding="utf-8")
     if not before_text.startswith(CANONICAL_HEADER):
-        # uv requires the canonical header to recognise the file it must rewrite.
+        # uv requires the canonical header to recognize the file it must rewrite.
         raise RuntimeError("upstream sysconfigdata lacks its canonical header comment")
     before_vars = _execute_sysconfigdata(path)
     values = _literal_build_time_vars(before_text)
@@ -414,7 +414,7 @@ def _patch_sysconfig_vars_json(path: Path) -> dict[str, Any]:
     """Drop what this file recorded about the machine that built it.
 
     Everything else is preserved byte for byte, which is checked rather than
-    assumed: the payload is re-serialised untouched first and has to reproduce
+    assumed: the payload is re-serialized untouched first and has to reproduce
     the file. If CPython ever writes it differently, that fails here instead of
     silently reformatting a file consumers read.
     """
@@ -422,7 +422,7 @@ def _patch_sysconfig_vars_json(path: Path) -> dict[str, Any]:
     payload = json.loads(before)
     if _dump_sysconfig_vars(payload) != before:
         raise RuntimeError(
-            f"unexpected serialisation of {path.name}; cannot patch it in place"
+            f"unexpected serialization of {path.name}; cannot patch it in place"
         )
 
     values = payload.get("build_time_vars", payload)
