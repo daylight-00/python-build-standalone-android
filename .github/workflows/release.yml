@@ -23,9 +23,9 @@ on:
         default: true
       allow-waiver:
         description: >-
-          Publish without a device receipt. Such a release is marked as a
-          prerelease, its notes say what it stands on, and it does not become
-          what uv installs.
+          Publish without a device receipt. Such a release is not
+          device-qualified, GitHub marks it Pre-release, its notes say what it
+          stands on, and it reaches only the edge channel, not what uv installs.
         type: boolean
         default: false
 
@@ -186,7 +186,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      # The release itself, and the latest-release branch machines resolve from.
+      # The release itself, and the catalog branches machines resolve from.
       contents: write
       # Signing the provenance attestation for every published archive.
       id-token: write
@@ -283,42 +283,64 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: gh release edit "$TAG" --draft=false
 
-      # Only for a qualified release. The catalogs are what `uv python install`
-      # resolves, so pointing them at bytes no device ran would make the
-      # unverified build the default rather than an opt-in.
-      - name: Update the latest-release branch
-        if: ${{ !inputs.dry-run && steps.channel.outputs.qualified == 'true' }}
+      # Two channels, so that following the newest release and trusting only
+      # what a device ran are separate choices. `edge` moves with every release.
+      # `latest-release` is what `uv python install` is told to resolve, so only
+      # a device-qualified release moves it: pointing it at bytes no device ran
+      # would make the unverified build the default.
+      - name: Update the catalog branches
+        if: ${{ !inputs.dry-run }}
         env:
           TAG: ${{ inputs.tag }}
+          QUALIFIED: ${{ steps.channel.outputs.qualified }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin latest-release || true
-          if git rev-parse --verify origin/latest-release >/dev/null 2>&1; then
-            git switch latest-release
-          else
-            git switch --orphan latest-release
+          publish() {
+            local branch=$1 found=0
+            # Exit 2 is "no such branch"; any other failure is the remote not
+            # answering, which must not read as the branch being absent.
+            git ls-remote --exit-code --heads origin "$branch" > /dev/null || found=$?
+            case "$found" in
+              0)
+                git fetch origin "$branch"
+                git switch -C "$branch" "origin/$branch"
+                ;;
+              2)
+                git switch --orphan "$branch"
+                ;;
+              *)
+                echo "cannot reach origin to look for $branch" >&2
+                return "$found"
+                ;;
+            esac
+            # A branch carries the catalogs and nothing else. Machines fetch from
+            # it by raw URL, and `git add -A -- '*.json'` matched at every depth,
+            # so each release also published its own build receipts here.
+            git rm -rq --cached . 2>/dev/null || true
+            find . -maxdepth 1 -name '*.json' -delete
+            cp dist/download-metadata*.json dist/latest-release.json .
+            git add -- ./download-metadata*.json ./latest-release.json
+            git commit -m "chore: publish $TAG catalogs"
+            git push origin "$branch"
+          }
+          publish edge
+          if [ "$QUALIFIED" = true ]; then
+            publish latest-release
           fi
-          # The branch carries the catalogs and nothing else. Machines fetch from
-          # it by raw URL, and `git add -A -- '*.json'` matched at every depth, so
-          # each release also published its own build receipts here.
-          git rm -rq --cached . 2>/dev/null || true
-          find . -maxdepth 1 -name '*.json' -delete
-          cp dist/download-metadata*.json dist/latest-release.json .
-          git add -- ./download-metadata*.json ./latest-release.json
-          git commit -m "chore: publish $TAG catalogs"
-          git push origin latest-release
 
-      - name: Note that the catalogs were left alone
+      - name: Note that latest-release was left alone
         if: ${{ !inputs.dry-run && steps.channel.outputs.qualified == 'false' }}
         env:
           TAG: ${{ inputs.tag }}
         run: |
-          echo "$TAG is published as a prerelease and is not device-qualified."
-          echo "latest-release and the uv catalogs still point at the last"
-          echo "qualified release. A published tag cannot be released again, so to"
-          echo "promote this build, qualify it on a device under a fresh tag, commit"
-          echo "the receipt, and release that tag without --allow-waiver."
+          echo "$TAG is published, marked Pre-release, and is not device-qualified."
+          echo "edge now points at it; latest-release and the uv catalogs still"
+          echo "point at the last device-qualified release. A published tag cannot"
+          echo "be released again, so to promote this build, qualify it on a device"
+          echo "under a fresh tag, commit the receipt, and release that tag without"
+          echo "--allow-waiver."
 
       - name: Dry run summary
         if: ${{ inputs.dry-run }}

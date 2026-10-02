@@ -5,9 +5,9 @@
 - **Gate** — publishing needs a device qualification receipt covering every artifact by SHA-256, committed under `qualification/<tag>/`.
 - **Evidence** — a receipt covers only the bytes it names, so this page describes what a release shipped, not the project in general.
 - **Without a receipt** — allowed, so a new CPython need not wait for a device; see [Releasing Without One](technotes.md#releasing-without-one).
-  - It is a prerelease; the top of its notes says what it stands on.
-  - The catalogs keep pointing at the last qualified release, so `uv python install` never resolves to it.
-  - The scope below describes qualified releases; a prerelease is what its own notes say.
+  - It is not device-qualified, and the top of its notes says what it stands on.
+  - `latest-release` keeps pointing at the last device-qualified release, so `uv python install` never resolves to it; the opt-in `edge` channel does ([Channels](running.md#channels)).
+  - The scope below describes device-qualified releases; any other is what its own notes say.
 
 ## Builds
 
