@@ -12,14 +12,14 @@
   },
   "python": {
     "implementation": "cpython",
-    "version": "3.14.8",
+    "version": "3.14.10",
     "major_minor": "3.14"
   },
   "archive": {
-    "filename": "python-3.14.8-aarch64-linux-android.tar.gz",
-    "url": "https://www.python.org/ftp/python/3.14.8/python-3.14.8-aarch64-linux-android.tar.gz",
-    "size_bytes": 22915536,
-    "sha256": "11324313957da3736f44e90257304d288864321a4dd376ed0cc35a54eacf9a33"
+    "filename": "python-3.14.10-aarch64-linux-android.tar.gz",
+    "url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-aarch64-linux-android.tar.gz",
+    "size_bytes": 23027305,
+    "sha256": "423c80b957330cf0ebb92b9b20f2294c292144a441bdb0ceb8c69d14928e569b"
   },
   "producer": {
     "cpython": "Python.org / CPython Android release tooling",

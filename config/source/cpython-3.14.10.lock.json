@@ -12,20 +12,20 @@
   },
   "python": {
     "implementation": "cpython",
-    "version": "3.14.8",
+    "version": "3.14.10",
     "major_minor": "3.14"
   },
   "source_archive": {
-    "filename": "Python-3.14.8.tar.xz",
-    "url": "https://www.python.org/ftp/python/3.14.8/Python-3.14.8.tar.xz",
-    "size_bytes": 24130644,
-    "sha256": "c2215904f02b175596dc49351585104f4bc20341e1c47378b26a2c274360ce73"
+    "filename": "Python-3.14.10.tar.xz",
+    "url": "https://www.python.org/ftp/python/3.14.10/Python-3.14.10.tar.xz",
+    "size_bytes": 24240392,
+    "sha256": "de414a57119abef52784d8993e341d53aed635fc2b05c2607d9f98a2c5b72032"
   },
   "build_flow": {
     "driver": "Android/android.py",
     "dependency_lock": "config/source/dependency-recipes.lock.json",
     "dependency_producer": "beeware/cpython-android-source-deps",
-    "dependency_binding": "the exact release assets pinned by CPython 3.14.8 Android/unpack_deps"
+    "dependency_binding": "the exact release assets pinned by CPython 3.14.10 Android/unpack_deps"
   },
   "runtime_data_defaults": {
     "openssldir": "/data/data/com.termux/files/usr/etc/tls",
